@@ -320,7 +320,7 @@ def update_item(
 
         for key, value in mutated_data.items():
             if (
-                key in ["media_type_id", "size_class_id"]
+                key in ["media_type_id", "size_class_id", "owner_id"] # Added owner_id here
                 and existing_item.__getattribute__(key) != value
                 and existing_item.verification_job_id
             ):
@@ -329,13 +329,20 @@ def update_item(
                     .filter(VerificationJob.id == existing_item.verification_job_id)
                     .first()
                 )
-                tray_barcode = (
-                    session.query(Barcode)
-                    .join(Tray, Barcode.id == Tray.barcode_id)
-                    .filter(Tray.id == item.tray_id)
-                    .first()
-                )
+                tray_barcode_val = "N/A"
+                if existing_item.tray_id:
+                    tray_barcode_obj = session.exec(select(Barcode).join(Tray).where(Tray.id == existing_item.tray_id)).first()
+                    if tray_barcode_obj:
+                        tray_barcode_val = tray_barcode_obj.value
+                # --- END: FIX FOR NON-TRAY ITEM ---
+
                 item_barcode = session.get(Barcode, existing_item.barcode_id)
+
+                # Determine change type
+                change_type = "UnknownEdit"
+                if key == "media_type_id": change_type = "MediaTypeEdit"
+                elif key == "size_class_id": change_type = "SizeClassEdit"
+                elif key == "owner_id": change_type = "OwnerEdit"
 
                 new_verification_change = VerificationChange(
                     workflow_id=verification_job.workflow_id,

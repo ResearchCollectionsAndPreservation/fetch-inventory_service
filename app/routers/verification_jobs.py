@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from fastapi_pagination import Page
+from fastapi_pagination import Page, Params
+from fastapi_pagination import paginate as generic_paginate
 from fastapi_pagination.ext.sqlmodel import paginate
 from sqlmodel import Session, select
 from datetime import datetime, timezone
@@ -128,59 +129,66 @@ def get_verification_job_list(
 
 @router.get("/dropdown/", response_model=Page[VerificationJobListDropdownOutput])
 def get_verification_job_list_lite(
-    unshelved: bool | None = False,
     session: Session = Depends(get_session),
-    params: JobFilterParams = Depends(),
-    sort_params: SortParams = Depends()
-) -> list:
-    filtered_jobs_cte = (
-        select(VerificationJob)
+    params: Params = Depends(),
+) -> Page[VerificationJobListDropdownOutput]:
+    job_ids = session.exec(
+        select(VerificationJob.id)
         .where(
-            VerificationJob.shelving_job_id == None,
+            VerificationJob.shelving_job_id.is_(None),
             VerificationJob.status == "Completed"
         )
-        .cte("filtered_jobs")
+        .order_by(VerificationJob.workflow_id.asc())
+    ).all()  # returns List[int]
+
+    if not job_ids:
+        return paginate([], params)
+
+    tray_counts = dict(
+        session.exec(
+            select(Tray.verification_job_id, func.count().label("count"))
+            .where(Tray.verification_job_id.in_(job_ids))
+            .group_by(Tray.verification_job_id)
+        ).all()
+    )
+    item_counts = dict(
+        session.exec(
+            select(Item.verification_job_id, func.count().label("count"))
+            .where(Item.verification_job_id.in_(job_ids))
+            .group_by(Item.verification_job_id)
+        ).all()
+    )
+    non_tray_counts = dict(
+        session.exec(
+            select(NonTrayItem.verification_job_id, func.count().label("count"))
+            .where(NonTrayItem.verification_job_id.in_(job_ids))
+            .group_by(NonTrayItem.verification_job_id)
+        ).all()
     )
 
-    VJ = aliased(filtered_jobs_cte)
-
-    tray_count_subq = (
-        select(func.count())
-        .select_from(Tray)
-        .where(Tray.verification_job_id == VJ.c.id)
-        .correlate(filtered_jobs_cte)
-        .scalar_subquery()
-    )
-
-    item_count_subq = (
-        select(func.count())
-        .select_from(Item)
-        .where(Item.verification_job_id == VJ.c.id)
-        .correlate(filtered_jobs_cte)
-        .scalar_subquery()
-    )
-
-    non_tray_item_count_subq = (
-        select(func.count())
-        .select_from(NonTrayItem)
-        .where(NonTrayItem.verification_job_id == VJ.c.id)
-        .correlate(filtered_jobs_cte)
-        .scalar_subquery()
-    )
-
-    query = (
+    jobs = session.exec(
         select(
-            VJ.c.id,
-            VJ.c.workflow_id,
-            VJ.c.trayed,
-            tray_count_subq.label("tray_count"),
-            item_count_subq.label("item_count"),
-            non_tray_item_count_subq.label("non_tray_item_count"),
+            VerificationJob.id,
+            VerificationJob.workflow_id,
+            VerificationJob.trayed,
         )
-        .order_by(VJ.c.workflow_id.asc())
-    )
+        .where(VerificationJob.id.in_(job_ids))
+        .order_by(VerificationJob.workflow_id.asc())
+    ).all()  # returns List[Row(id=…, workflow_id=…, trayed=…)]
 
-    return paginate(session, query)
+    dto_list = [
+        VerificationJobListDropdownOutput(
+            id=job.id,
+            workflow_id=job.workflow_id,
+            trayed=job.trayed,
+            tray_count=tray_counts.get(job.id, 0),
+            item_count=item_counts.get(job.id, 0),
+            non_tray_item_count=non_tray_counts.get(job.id, 0),
+        )
+        for job in jobs
+    ]
+
+    return generic_paginate(dto_list, params)
 
 
 @router.get("/{id}", response_model=VerificationJobDetailOutput)
