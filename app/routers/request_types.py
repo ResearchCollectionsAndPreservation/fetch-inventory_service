@@ -8,6 +8,7 @@ from fastapi_pagination.ext.sqlmodel import paginate
 from sqlalchemy.exc import IntegrityError
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.filter_params import SortParams
 from app.models.request_types import RequestType
 from app.schemas.request_types import (
@@ -36,6 +37,7 @@ def get_request_type_list(
     session: Session = Depends(get_session),
     sort_params: SortParams = Depends(),
     search: Optional[str] = Query(None, description="Search by Request Type Type"),
+    _: bool = Depends(require_permissions("can_access_request", "can_search", any_of=True)),
 ) -> list:
     """
     Get a list of request types
@@ -64,7 +66,11 @@ def get_request_type_list(
 
 
 @router.get("/types/{id}", response_model=RequestTypeDetailReadOutput)
-def get_request_type_detail(id: int, session: Session = Depends(get_session)):
+def get_request_type_detail(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_request", "can_search", any_of=True)),
+):
     """
     Retrieve request type details by ID
     """
@@ -77,7 +83,9 @@ def get_request_type_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/types", response_model=RequestTypeDetailWriteOutput, status_code=201)
 def create_request_type(
-    request_type_input: RequestTypeInput, session: Session = Depends(get_session)
+    request_type_input: RequestTypeInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_groups_and_permissions")),
 ) -> RequestType:
     """
     Create a Request Type
@@ -100,6 +108,7 @@ def update_request_type(
     id: int,
     request_type: RequestTypeUpdateInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_groups_and_permissions")),
 ):
     """
     Update an existing Request Type
@@ -127,7 +136,11 @@ def update_request_type(
 
 
 @router.delete("/types/{id}")
-def delete_request_type(id: int, session: Session = Depends(get_session)):
+def delete_request_type(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_groups_and_permissions")),
+):
     """
     Delete an Request Type by ID
     """

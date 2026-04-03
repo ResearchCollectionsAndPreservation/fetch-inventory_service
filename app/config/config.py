@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     IDP_ENTITY_ID: str = "https://idp.example.net/12345-ffff/"
     IDP_LOGIN_URL: str = "https://login.example.com/12345-fff/saml2"
     VUE_HOST: str = "https://localhost:8000"
+    JWT_SECRET_KEY: str = "your-secret-key"
     DATABASE_URL: str = (
         "postgresql://postgres:postgres@inventory-database:5432/inventory_service"
     )

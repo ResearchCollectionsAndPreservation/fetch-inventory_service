@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from starlette.responses import StreamingResponse
 
 from app.database.session import get_session, commit_record
+from app.permissions import require_permissions
 from app.events import update_shelf_space_after_tray
 from app.filter_params import SortParams, ItemFilterParams
 from app.logger import inventory_logger
@@ -54,6 +55,7 @@ def get_item_list(
     session: Session = Depends(get_session),
     params: ItemFilterParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_item_detail"))
 ) -> list:
     """
     Retrieve a paginated list of items from the database.
@@ -121,6 +123,7 @@ def get_item_list(
 def download_items(
     session: Session = Depends(get_session),
     params: ItemFilterParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_item_detail"))
 ):
     """
        Retrieve a paginated list of items from the database.
@@ -197,7 +200,7 @@ def download_items(
 
 
 @router.get("/{id}", response_model=ItemDetailReadOutput)
-def get_item_detail(id: int, session: Session = Depends(get_session)):
+def get_item_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_access_item_detail"))):
     """
     Retrieve details of a specific item by ID.
 
@@ -218,7 +221,7 @@ def get_item_detail(id: int, session: Session = Depends(get_session)):
 
 
 @router.get("/barcode/{value}", response_model=ItemDetailReadOutput)
-def get_item_by_barcode_value(value: str, session: Session = Depends(get_session)):
+def get_item_by_barcode_value(value: str, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_access_item_detail"))):
     """
     Retrieve a item using a barcode value
 
@@ -239,7 +242,11 @@ def get_item_by_barcode_value(value: str, session: Session = Depends(get_session
 
 
 @router.post("/", response_model=ItemDetailWriteOutput, status_code=201)
-def create_item(item_input: ItemInput, session: Session = Depends(get_session)):
+def create_item(
+    item_input: ItemInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_accession")),
+):
     """
     Create a new item in the database.
 
@@ -283,7 +290,7 @@ def create_item(item_input: ItemInput, session: Session = Depends(get_session)):
         new_item = previous_item
         new_item.scanned_for_verification = False
         new_item.scanned_for_refile_queue = False
-        barcode = select(Barcode).where(Barcode.id == new_item.barcode_id)
+        barcode = session.exec(select(Barcode).where(Barcode.id == new_item.barcode_id)).first()
         barcode.withdrawn = False
         session.add(barcode)
     session.add(new_item)
@@ -295,7 +302,10 @@ def create_item(item_input: ItemInput, session: Session = Depends(get_session)):
 
 @router.patch("/{id}", response_model=ItemDetailWriteOutput)
 def update_item(
-    id: int, item: ItemUpdateInput, session: Session = Depends(get_session)
+    id: int,
+    item: ItemUpdateInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_accession", "can_access_verification", any_of=True)),
 ):
     """
     Update item details in the database.
@@ -371,7 +381,11 @@ def update_item(
 
 
 @router.delete("/{id}")
-def delete_item(id: int, session: Session = Depends(get_session)):
+def delete_item(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_accession")),
+):
     """
     Delete an item by its ID.
 
@@ -401,6 +415,7 @@ def move_item(
     item_input: ItemMoveInput,
     session: Session = Depends(get_session),
     background_tasks: BackgroundTasks = None,
+    _: bool = Depends(require_permissions("can_move_trays_and_items"))
 ):
     """
     Move an item from one location to another.

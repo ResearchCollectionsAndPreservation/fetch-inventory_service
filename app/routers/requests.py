@@ -7,6 +7,7 @@ from fastapi_pagination.ext.sqlmodel import paginate
 from sqlalchemy import asc, desc, or_, func
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.pagination.requests import RequestListPagination
 from app.filter_params import SortParams, RequestFilterParams
 from app.logger import inventory_logger
@@ -49,6 +50,7 @@ def get_request_list(
     session: Session = Depends(get_session),
     params: RequestFilterParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_request")),
 ) -> list:
     """
     Get a list of requests
@@ -208,7 +210,11 @@ def get_request_list(
 
 
 @router.get("/{id}", response_model=RequestDetailReadOutput)
-def get_request_detail(id: int, session: Session = Depends(get_session)):
+def get_request_detail(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_request")),
+):
     """
     Retrieve request details by ID
 
@@ -227,7 +233,9 @@ def get_request_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=RequestDetailWriteOutput, status_code=201)
 def create_request(
-    request_input: RequestInput, session: Session = Depends(get_session)
+    request_input: RequestInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_create_and_submit_manual_requests")),
 ) -> Request:
     """
     Create a Request
@@ -349,7 +357,10 @@ def create_request(
 
 @router.patch("/{id}", response_model=RequestDetailWriteOutput)
 def update_request(
-    id: int, request: RequestUpdateInput, session: Session = Depends(get_session)
+    id: int,
+    request: RequestUpdateInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_request")),
 ):
     """
     Update an existing Request
@@ -403,7 +414,11 @@ def update_request(
 
 
 @router.delete("/{id}")
-def delete_request(id: int, session: Session = Depends(get_session)):
+def delete_request(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_delete_request")),
+):
     """
     Delete an Request by ID
 

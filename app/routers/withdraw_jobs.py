@@ -14,6 +14,7 @@ from app.config.exceptions import (
     ValidationException,
 )
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.filter_params import SortParams, JobFilterParams
 from app.events import update_shelf_space_after_tray, update_shelf_space_after_non_tray
 from app.filter_params import JobFilterParams, SortParams
@@ -77,7 +78,8 @@ def validate_withdraw_item(items, job_id, status, session):
 def get_withdraw_job_list(
     session: Session = Depends(get_session),
     params: JobFilterParams = Depends(),
-    sort_params: SortParams = Depends()
+    sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_withdraw"))
 ) -> list:
     """
     Retrieve a paginated list of withdraw jobs.
@@ -142,7 +144,7 @@ def get_withdraw_job_list(
 
 
 @router.get("/{id}", response_model=WithdrawJobDetailOutput)
-def get_withdraw_job_detail(id: int, session: Session = Depends(get_session)):
+def get_withdraw_job_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_access_withdraw"))):
     """
     Retrieves the details of a withdraw job from the database using the provided ID.
 
@@ -165,7 +167,7 @@ def get_withdraw_job_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=WithdrawJobWriteOutput)
 def create_withdraw_job(
-    withdraw_job_input: WithdrawJobInput, session: Session = Depends(get_session)
+    withdraw_job_input: WithdrawJobInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_access_withdraw"))
 ) -> WithdrawJob:
     """
     Creates a new withdraw job in the database.
@@ -193,6 +195,7 @@ def update_withdraw_job(
     id: int,
     withdraw_job_input: WithdrawJobUpdateInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_withdraw"))
 ):
     """
     Updates an existing withdraw job in the database.
@@ -559,7 +562,7 @@ def update_withdraw_job(
 
 
 @router.delete("/{job_id}")
-def delete_withdraw_job(job_id: int, session: Session = Depends(get_session)):
+def delete_withdraw_job(job_id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_access_withdraw"))):
     """
     Deletes a withdraw job from the database.
 
@@ -647,6 +650,7 @@ def add_items_to_withdraw_job(
     job_id: int,
     withdraw_job_input: WithdrawJobInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_withdraw"))
 ):
     lookup_barcode_value = withdraw_job_input.barcode_value
     update_dt = datetime.now(timezone.utc)
@@ -863,6 +867,7 @@ def remove_items_from_withdraw_job(
     job_id: int,
     withdraw_job_input: WithdrawJobInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_withdraw"))
 ) -> WithdrawJobDetailOutput:
     """
     Deletes a tray from a withdraw job in the database.

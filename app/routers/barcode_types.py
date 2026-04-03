@@ -20,6 +20,7 @@ from app.config.exceptions import (
     InternalServerError
 )
 from app.sorting import BaseSorter
+from app.permissions import require_permissions
 
 router = APIRouter(
     prefix="/barcodes",
@@ -78,7 +79,8 @@ def get_barcode_types_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/types", response_model=BarcodeTypesDetailWriteOutput, status_code=201)
 def create_barcode_types(
-    barcode_types_input: BarcodeTypesInput, session: Session = Depends(get_session)
+    barcode_types_input: BarcodeTypesInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ) -> BarcodeType:
     """
     Creates a new barcode type using the provided input data.
@@ -104,7 +106,8 @@ def create_barcode_types(
 
 @router.patch("/types/{id}", response_model=BarcodeTypesDetailWriteOutput)
 def update_barcode_types(
-    id: int, barcode_types: BarcodeTypesInput, session: Session = Depends(get_session)
+    id: int, barcode_types: BarcodeTypesInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Update barcode type details.
@@ -139,7 +142,7 @@ def update_barcode_types(
 
 
 @router.delete("/types/{id}")
-def delete_barcode_types(id: int, session: Session = Depends(get_session)):
+def delete_barcode_types(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Delete barcode types by id.
 

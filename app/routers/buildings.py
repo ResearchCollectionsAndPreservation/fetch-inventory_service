@@ -8,6 +8,7 @@ from sqlmodel import Session, select
 from sqlalchemy.exc import IntegrityError
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.filter_params import SortParams
 from app.models.buildings import Building
 from app.schemas.buildings import (
@@ -38,6 +39,7 @@ def get_building_list(
     session: Session = Depends(get_session),
     sort_params: SortParams = Depends(),
     search: Optional[str] = Query(None, description="Search by Building name"),
+    _: bool = Depends(require_permissions("can_manage_locations"))
 ) -> list:
     """
     Get a paginated list of buildings.
@@ -66,7 +68,7 @@ def get_building_list(
 
 
 @router.get("/{id}", response_model=BuildingDetailReadOutput)
-def get_building_detail(id: int, session: Session = Depends(get_session)):
+def get_building_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Get building detail by ID.
 
@@ -89,7 +91,7 @@ def get_building_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=BuildingDetailWriteOutput, status_code=201)
 def create_building(
-    building_input: BuildingInput, session: Session = Depends(get_session)
+    building_input: BuildingInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))
 ) -> Building:
     """
     Create a building:
@@ -113,7 +115,7 @@ def create_building(
 
 @router.patch("/{id}", response_model=BuildingDetailWriteOutput)
 def update_building(
-    id: int, building: BuildingUpdateInput, session: Session = Depends(get_session)
+    id: int, building: BuildingUpdateInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))
 ):
     """
     Update a building:
@@ -153,7 +155,7 @@ def update_building(
 
 
 @router.delete("/{id}")
-def delete_building(id: int, session: Session = Depends(get_session)):
+def delete_building(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Delete a building by ID.
 

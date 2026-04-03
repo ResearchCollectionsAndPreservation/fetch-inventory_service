@@ -5,6 +5,7 @@ from sqlmodel import Session, select
 from datetime import datetime, timezone
 
 from app.database.session import get_session, commit_record
+from app.permissions import require_permissions
 from app.filter_params import SortParams, ItemFilterParams
 from app.events import update_shelf_space_after_tray
 from app.logger import inventory_logger
@@ -48,6 +49,7 @@ def get_tray_list(
     session: Session = Depends(get_session),
     params: ItemFilterParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_tray_detail"))
 ) -> list:
     """
     Get a paginated list of trays from the database
@@ -104,7 +106,7 @@ def get_tray_list(
 
 
 @router.get("/{id}", response_model=TrayDetailReadOutput)
-def get_tray_detail(id: int, session: Session = Depends(get_session)):
+def get_tray_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_access_tray_detail"))):
     """
     Retrieve the details of a tray by its ID
     """
@@ -117,7 +119,7 @@ def get_tray_detail(id: int, session: Session = Depends(get_session)):
 
 
 @router.get("/barcode/{value}", response_model=TrayDetailReadOutput)
-def get_tray_by_barcode_value(value: str, session: Session = Depends(get_session)):
+def get_tray_by_barcode_value(value: str, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_access_tray_detail"))):
     """
     Retrieve a tray using a barcode value
 
@@ -139,7 +141,11 @@ def get_tray_by_barcode_value(value: str, session: Session = Depends(get_session
 
 
 @router.post("/", response_model=TrayDetailWriteOutput, status_code=201)
-def create_tray(tray_input: TrayInput, session: Session = Depends(get_session)):
+def create_tray(
+    tray_input: TrayInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_accession")),
+):
     """
     Create a new tray record
     """
@@ -167,6 +173,25 @@ def create_tray(tray_input: TrayInput, session: Session = Depends(get_session)):
     if not new_tray.accession_dt:
         new_tray.accession_dt = datetime.now(timezone.utc)
     new_tray.container_type_id = container_type.id
+
+    # check if existing withdrawn tray with this barcode
+    previous_tray = session.exec(
+        select(Tray).where(Tray.withdrawn_barcode_id == new_tray.barcode_id)
+    ).first()
+    if previous_tray:
+        # use existing, and patch values
+        for field, value in new_tray.model_dump(exclude={"id"}).items():
+            setattr(previous_tray, field, value)
+        new_tray = previous_tray
+        new_tray.scanned_for_verification = False
+        new_tray.scanned_for_shelving = False
+        new_tray.scanned_for_refile_queue = False
+        new_tray.withdrawn_barcode_id = None
+        new_tray.withdrawal_dt = None
+        barcode = session.exec(select(Barcode).where(Barcode.id == new_tray.barcode_id)).first()
+        barcode.withdrawn = False
+        session.add(barcode)
+
     session.add(new_tray)
     session.commit()
     session.refresh(new_tray)
@@ -184,6 +209,7 @@ def update_tray(
     tray: TrayUpdateInput,
     session: Session = Depends(get_session),
     background_tasks: BackgroundTasks = None,
+    _: bool = Depends(require_permissions("can_access_accession", "can_access_verification", any_of=True)),
 ):
     """
     Update a tray record in the database.
@@ -283,7 +309,11 @@ def update_tray(
 
 
 @router.delete("/{id}")
-def delete_tray(id: int, session: Session = Depends(get_session)):
+def delete_tray(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_accession")),
+):
     """
     Delete a tray by its ID
     """
@@ -320,6 +350,7 @@ def move_tray(
     barcode_value: str,
     tray_input: TrayMoveInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_move_trays_and_items"))
 ):
     """
     Move a tray from one location to another.

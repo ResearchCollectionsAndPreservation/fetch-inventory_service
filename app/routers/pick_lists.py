@@ -8,6 +8,7 @@ from fastapi_pagination.ext.sqlmodel import paginate
 from sqlalchemy.exc import IntegrityError
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.logger import inventory_logger
 from app.filter_params import SortParams, JobFilterParams
 from app.models.buildings import Building
@@ -130,6 +131,7 @@ def get_pick_list_list(
     session: Session = Depends(get_session),
     params: JobFilterParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_picklist")),
 ) -> list:
     """
     Get a list of pick lists.
@@ -195,7 +197,11 @@ def get_pick_list_list(
 
 
 @router.get("/{id}", response_model=PickListDetailOutput)
-def get_pick_list_detail(id: int, session: Session = Depends(get_session)):
+def get_pick_list_detail(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_picklist")),
+):
     """
     Retrieve pick list details by ID.
 
@@ -218,7 +224,9 @@ def get_pick_list_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=PickListDetailOutput, status_code=201)
 def create_pick_list(
-    pick_list_input: PickListInput, session: Session = Depends(get_session)
+    pick_list_input: PickListInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_create_picklist_job")),
 ):
     """
     Create a new pick list.
@@ -277,7 +285,10 @@ def create_pick_list(
 
 @router.patch("/{id}", response_model=PickListDetailOutput)
 def update_pick_list(
-    id: int, pick_list: PickListUpdateInput, session: Session = Depends(get_session)
+    id: int,
+    pick_list: PickListUpdateInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_edit_picklist_job")),
 ):
     """
     Update an existing pick list.
@@ -423,6 +434,7 @@ def add_request_to_pick_list(
     pick_list_id: int,
     pick_list_input: PickListInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_add_to_picklist_job")),
 ):
     """
     Add a request to an existing pick list.
@@ -510,6 +522,7 @@ def update_request_for_pick_list(
     request_id: int,
     pick_list_request_input: PickListUpdateRequestInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_edit_picklist_job")),
 ):
     """
     Update a request for an existing pick list.
@@ -580,7 +593,10 @@ def update_request_for_pick_list(
     "/{pick_list_id}/remove_request/{request_id}", response_model=PickListDetailOutput
 )
 def remove_request_from_pick_list(
-    pick_list_id: int, request_id: int, session: Session = Depends(get_session)
+    pick_list_id: int,
+    request_id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_edit_picklist_job")),
 ):
     """
     Remove a request from an existing pick list.
@@ -672,7 +688,11 @@ def remove_request_from_pick_list(
 
 
 @router.delete("/{id}")
-def delete_pick_list(id: int, session: Session = Depends(get_session)):
+def delete_pick_list(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_delete_picklist_job")),
+):
     """
     Delete an existing pick list.
 

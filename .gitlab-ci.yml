@@ -27,6 +27,7 @@ build_image_dev:
     - echo $DEVELOP_ENABLE_ORM_SQL_LOGGING >> .env
     - echo $DEVELOP_ALLOWED_ORIGINS_REGEX >> .env
     - echo $DEVELOP_ALLOWED_ORIGINS >> .env
+    - echo $DEVELOP_JWT_SECRET_KEY >> .env
     - echo "COMMIT=$CI_COMMIT_SHORT_SHA" >> .env
     - echo "BRANCH=$CI_COMMIT_BRANCH" >> .env
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
@@ -58,6 +59,7 @@ build_demo:
     - echo $DEVELOP_ENABLE_ORM_SQL_LOGGING >> .env
     - echo $DEVELOP_ALLOWED_ORIGINS_REGEX >> .env
     - echo $DEVELOP_ALLOWED_ORIGINS >> .env
+    - echo $DEVELOP_JWT_SECRET_KEY >> .env
     - echo "COMMIT=$CI_COMMIT_SHORT_SHA" >> .env
     - echo "BRANCH=$CI_COMMIT_BRANCH" >> .env
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
@@ -90,6 +92,7 @@ build_mr:
     - echo $DEVELOP_ENABLE_ORM_SQL_LOGGING >> .env
     - echo $DEVELOP_ALLOWED_ORIGINS_REGEX >> .env
     - echo $DEVELOP_ALLOWED_ORIGINS >> .env
+    - echo $DEVELOP_JWT_SECRET_KEY >> .env
     - echo "COMMIT=$CI_COMMIT_SHORT_SHA" >> .env
     - echo "BRANCH=$CI_COMMIT_BRANCH" >> .env
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
@@ -120,6 +123,7 @@ build_image_test:
     - echo $TEST_ENABLE_ORM_SQL_LOGGING >> .env
     - echo $TEST_ALLOWED_ORIGINS_REGEX >> .env
     - echo $TEST_ALLOWED_ORIGINS >> .env
+    - echo $TEST_JWT_SECRET_KEY >> .env
     - echo "COMMIT=$CI_COMMIT_SHORT_SHA" >> .env
     - echo "BRANCH=$CI_COMMIT_BRANCH" >> .env
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
@@ -149,6 +153,7 @@ build_image_staging:
     - echo $STAGING_ENABLE_ORM_SQL_LOGGING >> .env
     - echo $STAGING_ALLOWED_ORIGINS_REGEX >> .env
     - echo $STAGING_ALLOWED_ORIGINS >> .env
+    - echo $STAGING_JWT_SECRET_KEY >> .env
     - echo "COMMIT=$CI_COMMIT_SHORT_SHA" >> .env
     - echo "BRANCH=$CI_COMMIT_BRANCH" >> .env
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
@@ -179,6 +184,7 @@ build_image_prod:
     - echo $PROD_ENABLE_ORM_SQL_LOGGING >> .env
     - echo $PROD_ALLOWED_ORIGINS_REGEX >> .env
     - echo $PROD_ALLOWED_ORIGINS >> .env
+    - echo $PROD_JWT_SECRET_KEY >> .env
     - echo "COMMIT=$CI_COMMIT_SHORT_SHA" >> .env
     - echo "BRANCH=$CI_COMMIT_BRANCH" >> .env
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY

@@ -9,6 +9,7 @@ from typing import Optional
 from sqlalchemy.exc import IntegrityError
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.filter_params import SortParams, ModuleFilterParams
 from app.models.modules import Module
 from app.models.buildings import Building
@@ -36,6 +37,7 @@ def get_module_list(
     params: ModuleFilterParams = Depends(),
     sort_params: SortParams = Depends(),
     search: Optional[str] = Query(None, description="Search by Module Number"),
+    _: bool = Depends(require_permissions("can_manage_locations"))
 ) -> list:
     """
     Retrieve a paginated list of modules.
@@ -69,7 +71,7 @@ def get_module_list(
 
 
 @router.get("/{id}", response_model=ModuleDetailReadOutput)
-def get_module_detail(id: int, session: Session = Depends(get_session)):
+def get_module_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Retrieve module details by ID.
 
@@ -92,7 +94,7 @@ def get_module_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=ModuleDetailWriteOutput, status_code=201)
 def create_module(
-    module_input: ModuleInput, session: Session = Depends(get_session)
+    module_input: ModuleInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))
 ) -> Module:
     """
     Create a module:
@@ -124,7 +126,7 @@ def create_module(
 
 @router.patch("/{id}", response_model=ModuleDetailWriteOutput)
 def update_module(
-    id: int, module: ModuleUpdateInput, session: Session = Depends(get_session)
+    id: int, module: ModuleUpdateInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))
 ):
     """
     Update a module by its ID.
@@ -159,7 +161,7 @@ def update_module(
 
 
 @router.delete("/{id}")
-def delete_module(id: int, session: Session = Depends(get_session)):
+def delete_module(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Delete a module by its ID.
 

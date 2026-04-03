@@ -10,6 +10,7 @@ from fastapi_pagination import paginate as paginate_list
 from fastapi_pagination.ext.sqlmodel import paginate
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.filter_params import SortParams
 from app.models.owners import Owner
 from app.models.shelf_types import ShelfType
@@ -52,6 +53,7 @@ def get_shelf_list(
     params: ShelfFilterParams = Depends(),
     sort_params: SortParams = Depends(),
     search: Optional[str] = Query(None, description="Search by Shelf location"),
+    _: bool = Depends(require_permissions("can_manage_locations"))
 ) -> list:
     """
     Get a list of shelves.
@@ -159,7 +161,7 @@ def get_shelf_list(
 
 
 @router.get("/{id}", response_model=ShelfDetailReadOutput)
-def get_shelf_detail(id: int, session: Session = Depends(get_session)):
+def get_shelf_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Retrieves the details of a shelf with the given ID.
 
@@ -181,7 +183,7 @@ def get_shelf_detail(id: int, session: Session = Depends(get_session)):
 
 
 @router.get("/barcode/{value}", response_model=ShelfDetailReadOutput)
-def get_shelf_by_barcode_value(value: str, session: Session = Depends(get_session)):
+def get_shelf_by_barcode_value(value: str, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Retrieve a shelf using a barcode value
 
@@ -197,7 +199,7 @@ def get_shelf_by_barcode_value(value: str, session: Session = Depends(get_sessio
 
 @router.get("/barcode/{value}/shelved", response_model=Page[dict])
 def get_shelved_entities_by_shelf_barcode_value(
-    value: str, session: Session = Depends(get_session)
+    value: str, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))
 ):
     """
     Retrieve tray and non_tray barcode list from things on a shelf
@@ -264,7 +266,7 @@ def get_shelved_entities_by_shelf_barcode_value(
 
 @router.post("/", response_model=ShelfDetailWriteOutput, status_code=201)
 def create_shelf(
-    shelf_input: ShelfInput, session: Session = Depends(get_session)
+    shelf_input: ShelfInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))
 ) -> Shelf:
     """
     Create a shelf and efficiently bulk-creates its associated shelf positions.
@@ -349,7 +351,7 @@ def create_shelf(
 
 @router.patch("/{id}", response_model=ShelfDetailWriteOutput)
 def update_shelf(
-    id: int, shelf_input: ShelfUpdateInput, session: Session = Depends(get_session)
+    id: int, shelf_input: ShelfUpdateInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))
 ):
     """
     Update a shelf with the given ID.
@@ -467,7 +469,7 @@ def update_shelf(
 
 
 @router.delete("/{id}")
-def delete_shelf(id: int, session: Session = Depends(get_session)):
+def delete_shelf(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Delete a shelf by its ID.
 

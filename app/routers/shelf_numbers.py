@@ -19,6 +19,7 @@ from app.config.exceptions import (
     InternalServerError,
 )
 from app.sorting import BaseSorter
+from app.permissions import require_permissions
 
 router = APIRouter(
     prefix="/shelves",
@@ -76,7 +77,8 @@ def get_shelf_number_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/numbers", response_model=ShelfNumberDetailOutput, status_code=201)
 def create_shelf_number(
-    shelf_number_input: ShelfNumberInput, session: Session = Depends(get_session)
+    shelf_number_input: ShelfNumberInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ) -> ShelfNumber:
     """
     Create a shelf number:
@@ -104,7 +106,8 @@ def create_shelf_number(
 
 @router.patch("/numbers/{id}", response_model=ShelfNumberDetailOutput)
 def update_shelf_number(
-    id: int, shelf_number: ShelfNumberInput, session: Session = Depends(get_session)
+    id: int, shelf_number: ShelfNumberInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Update a shelf number in the database.
@@ -143,7 +146,7 @@ def update_shelf_number(
 
 
 @router.delete("/numbers/{id}")
-def delete_shelf_number(id: int, session: Session = Depends(get_session)):
+def delete_shelf_number(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Delete a shelf number by ID.
 

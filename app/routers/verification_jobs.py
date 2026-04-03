@@ -4,11 +4,11 @@ from fastapi_pagination import paginate as generic_paginate
 from fastapi_pagination.ext.sqlmodel import paginate
 from sqlmodel import Session, select
 from datetime import datetime, timezone
-from sqlalchemy import func, distinct
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import aliased
 
 from app.database.session import get_session, commit_record
+from app.permissions import require_permissions
 from app.filter_params import SortParams, JobFilterParams
 from app.models.barcodes import Barcode
 from app.models.container_types import ContainerType
@@ -51,7 +51,8 @@ def get_verification_job_list(
     unshelved: bool | None = False,
     session: Session = Depends(get_session),
     params: JobFilterParams = Depends(),
-    sort_params: SortParams = Depends()
+    sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_verification")),
 ) -> list:
     """
     Retrieve a paginated list of verification jobs.
@@ -77,7 +78,6 @@ def get_verification_job_list(
     """
     # Create a query to select all Verification Job from the database
     query = select(VerificationJob)
-
     if unshelved:
         # retrieve completed verification jobs that haven't been shelved
         query = query.where(VerificationJob.shelving_job_id == None).where(
@@ -124,13 +124,73 @@ def get_verification_job_list(
         sorter = BaseSorter(VerificationJob)
         query = sorter.apply_sorting(query, sort_params)
 
-    return paginate(session, query)
+    # Paginate the query to get the page of verification jobs
+    page = paginate(session, query)
+
+    # Collect job IDs from the paginated results to compute counts
+    job_ids = [job.id for job in page.items]
+
+    if job_ids:
+        # Compute counts via DB aggregation instead of loading full relationships
+        tray_counts = dict(
+            session.exec(
+                select(Tray.verification_job_id, func.count().label("count"))
+                .where(Tray.verification_job_id.in_(job_ids))
+                .group_by(Tray.verification_job_id)
+            ).all()
+        )
+        item_counts = dict(
+            session.exec(
+                select(Item.verification_job_id, func.count().label("count"))
+                .where(Item.verification_job_id.in_(job_ids))
+                .group_by(Item.verification_job_id)
+            ).all()
+        )
+        non_tray_counts = dict(
+            session.exec(
+                select(NonTrayItem.verification_job_id, func.count().label("count"))
+                .where(NonTrayItem.verification_job_id.in_(job_ids))
+                .group_by(NonTrayItem.verification_job_id)
+            ).all()
+        )
+    else:
+        tray_counts = {}
+        item_counts = {}
+        non_tray_counts = {}
+
+    # Build output DTOs with counts injected
+    page.items = [
+        VerificationJobListOutput(
+            id=job.id,
+            workflow_id=job.workflow_id,
+            trayed=job.trayed,
+            status=job.status,
+            owner_id=job.owner_id,
+            media_type_id=job.media_type_id,
+            size_class_id=job.size_class_id,
+            shelving_job_id=job.shelving_job_id,
+            container_type_id=job.container_type_id,
+            container_type=job.container_type,
+            user_id=job.user_id,
+            created_by_id=job.created_by_id,
+            user=job.user,
+            created_by=job.created_by,
+            create_dt=job.create_dt,
+            tray_count=tray_counts.get(job.id, 0),
+            item_count=item_counts.get(job.id, 0),
+            non_tray_item_count=non_tray_counts.get(job.id, 0),
+        )
+        for job in page.items
+    ]
+
+    return page
 
 
 @router.get("/dropdown/", response_model=Page[VerificationJobListDropdownOutput])
 def get_verification_job_list_lite(
     session: Session = Depends(get_session),
     params: Params = Depends(),
+    _: bool = Depends(require_permissions("can_access_verification")),
 ) -> Page[VerificationJobListDropdownOutput]:
     job_ids = session.exec(
         select(VerificationJob.id)
@@ -192,7 +252,11 @@ def get_verification_job_list_lite(
 
 
 @router.get("/{id}", response_model=VerificationJobDetailOutput)
-def get_verification_job_detail(id: int, session: Session = Depends(get_session)):
+def get_verification_job_detail(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_verification")),
+):
     """
     Retrieves the verification job detail for the given ID.
 
@@ -214,7 +278,11 @@ def get_verification_job_detail(id: int, session: Session = Depends(get_session)
 
 
 @router.get("/by-accession-job-id/{id}", response_model=VerificationJobAccCheckOutput)
-def get_verification_job_id_by_acc_job_id(id: int, session: Session = Depends(get_session)):
+def get_verification_job_id_by_acc_job_id(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_verification")),
+):
     """
     This is a quick check endpoint to help the front-end determine if
     an Accession Job has been lost in limbo when Verification Job transition
@@ -231,7 +299,9 @@ def get_verification_job_id_by_acc_job_id(id: int, session: Session = Depends(ge
 
 @router.get("/workflow/{id}", response_model=VerificationJobDetailOutput)
 def get_verification_job_detail_by_workflow(
-    id: int, session: Session = Depends(get_session)
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_verification")),
 ):
     """
     Retrieves the verification job detail for the given workflow ID.
@@ -259,6 +329,7 @@ def get_verification_job_detail_by_workflow(
 def create_verification_job(
     verification_job_input: VerificationJobInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_verification")),
 ):
     """
     Create a new verification job:
@@ -289,6 +360,7 @@ def update_verification_job(
     verification_job: VerificationJobUpdateInput,
     session: Session = Depends(get_session),
     background_tasks: BackgroundTasks = None,
+    _: bool = Depends(require_permissions("can_access_verification")),
 ):
     """
     Update a verification job:
@@ -361,7 +433,11 @@ def update_verification_job(
 
 
 @router.delete("/{id}")
-def delete_verification_job(id: int, session: Session = Depends(get_session)):
+def delete_verification_job(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_cancel_verification_job")),
+):
     """
     Delete a verification job by its ID.
 
@@ -432,7 +508,8 @@ def delete_verification_job(id: int, session: Session = Depends(get_session)):
 def add_item_to_verification_job(
     id: int,
     input: VerificationJobAddInput,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_verification")),
 ):
     """
     Add an item to a verification job.
@@ -510,7 +587,8 @@ def add_item_to_verification_job(
 def remove_item_from_verification_job(
     id: int,
     input: VerificationJobRemoveInput,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_verification")),
 ):
     """
     Remove an item from a verification job.

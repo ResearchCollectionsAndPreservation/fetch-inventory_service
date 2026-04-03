@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.filter_params import SortParams, AisleFilterParams
 from app.models.aisles import Aisle
 from app.models.aisle_numbers import AisleNumber
@@ -36,6 +37,7 @@ def get_aisle_list(
     params: AisleFilterParams = Depends(),
     sort_params: SortParams = Depends(),
     search: Optional[str] = Query(None, description="Search by Aisle Number"),
+    _: bool = Depends(require_permissions("can_manage_locations"))
 ) -> list:
     """
     Get a paginated list of aisles.
@@ -73,7 +75,7 @@ def get_aisle_list(
 
 
 @router.get("/{id}", response_model=AisleDetailReadOutput)
-def get_aisle_detail(id: int, session: Session = Depends(get_session)):
+def get_aisle_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Retrieves the details of an aisle from the database using the provided ID.
 
@@ -96,7 +98,7 @@ def get_aisle_detail(id: int, session: Session = Depends(get_session)):
 
 
 @router.post("/", response_model=AisleDetailWriteOutput, status_code=201)
-def create_aisle(aisle_input: AisleInput, session: Session = Depends(get_session)):
+def create_aisle(aisle_input: AisleInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Create a new aisle.
 
@@ -146,7 +148,7 @@ def create_aisle(aisle_input: AisleInput, session: Session = Depends(get_session
 
 @router.patch("/{id}", response_model=AisleDetailWriteOutput)
 def update_aisle(
-    id: int, aisle: AisleUpdateInput, session: Session = Depends(get_session)
+    id: int, aisle: AisleUpdateInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))
 ):
     """
     Updates an aisle with the given ID using the provided aisle data.
@@ -183,7 +185,7 @@ def update_aisle(
 
 
 @router.delete("/{id}")
-def delete_aisle(id: int, session: Session = Depends(get_session)):
+def delete_aisle(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Delete an aisle with the given id.
 

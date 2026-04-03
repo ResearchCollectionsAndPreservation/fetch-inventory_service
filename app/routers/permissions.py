@@ -7,6 +7,7 @@ from sqlalchemy import asc, desc
 from datetime import datetime, timezone
 
 from app.database.session import get_session, commit_record
+from app.permissions import permissions_cache, require_permissions
 from app.filter_params import SortParams
 from app.models.permissions import Permission
 from app.schemas.permissions import (
@@ -30,7 +31,8 @@ router = APIRouter(
 @router.get("/", response_model=Page[PermissionListOutput])
 def get_permission_list(
     session: Session = Depends(get_session),
-    sort_params: SortParams = Depends()
+    sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_manage_groups_and_permissions")),
 ) -> list:
     """
     Get a paginated list of permissions.
@@ -53,7 +55,11 @@ def get_permission_list(
 
 
 @router.get("/{id}", response_model=PermissionDetailReadOutput)
-def get_permission_detail(id: int, session: Session = Depends(get_session)):
+def get_permission_detail(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_groups_and_permissions")),
+):
     """
     Retrieves the details of a permission from the database using the provided ID.
 
@@ -77,7 +83,9 @@ def get_permission_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=PermissionDetailWriteOutput, status_code=201)
 def create_permission(
-    permission_input: PermissionInput, session: Session = Depends(get_session)
+    permission_input: PermissionInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_groups_and_permissions")),
 ):
     """
     Create a new permission in the database.
@@ -101,7 +109,10 @@ def create_permission(
 
 @router.patch("/{id}", response_model=PermissionDetailWriteOutput)
 def update_permission(
-    id: int, permission_input: PermissionInput, session: Session = Depends(get_session)
+    id: int,
+    permission_input: PermissionInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_groups_and_permissions")),
 ):
     """
     Update an existing permission in the database.
@@ -133,7 +144,11 @@ def update_permission(
 
 
 @router.delete("/{id}")
-def delete_permission(id: int, session: Session = Depends(get_session)):
+def delete_permission(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_groups_and_permissions")),
+):
     """
     Delete a permission from the database.
 
@@ -151,6 +166,10 @@ def delete_permission(id: int, session: Session = Depends(get_session)):
     if permission:
         session.delete(permission)
         session.commit()
+
+        # Invalidate permissions cache so changes take effect immediately
+        permissions_cache.refresh_if_needed(force=True)
+
         return HTTPException(
             status_code=204, detail=f"Permission ID {id} Deleted Successfully"
         )

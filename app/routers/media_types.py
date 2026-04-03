@@ -8,6 +8,7 @@ from fastapi_pagination.ext.sqlmodel import paginate
 from sqlalchemy.exc import IntegrityError
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.filter_params import SortParams
 from app.models.media_types import MediaType
 
@@ -35,6 +36,7 @@ def get_media_type_list(
     session: Session = Depends(get_session),
     sort_params: SortParams = Depends(),
     search: Optional[str] = Query(None, description="Search by Media Type Name"),
+    _: bool = Depends(require_permissions("can_manage_media_type"))
 ) -> list:
     """
     Retrieve a list of media types
@@ -63,7 +65,7 @@ def get_media_type_list(
 
 
 @router.get("/{id}", response_model=MediaTypeDetailReadOutput)
-def get_media_type_detail(id: int, session: Session = Depends(get_session)):
+def get_media_type_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_media_type"))):
     """
     Retrieve the details of a media type by its ID.
     """
@@ -76,7 +78,7 @@ def get_media_type_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=MediaTypeDetailWriteOutput, status_code=201)
 def create_media_type(
-    media_type_input: MediaTypeInput, session: Session = Depends(get_session)
+    media_type_input: MediaTypeInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_media_type"))
 ):
     """
     Create a new media type record.
@@ -98,7 +100,7 @@ def create_media_type(
 
 @router.patch("/{id}", response_model=MediaTypeDetailWriteOutput)
 def update_media_type(
-    id: int, media_type: MediaTypeInput, session: Session = Depends(get_session)
+    id: int, media_type: MediaTypeInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_media_type"))
 ):
     """
     Update a media type record by its id.
@@ -127,7 +129,7 @@ def update_media_type(
 
 
 @router.delete("/{id}", status_code=204)
-def delete_media_type(id: int, session: Session = Depends(get_session)):
+def delete_media_type(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_media_type"))):
     """
     Delete a media type by its ID.
     """

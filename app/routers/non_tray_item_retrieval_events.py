@@ -17,6 +17,7 @@ from app.schemas.non_tray_tem_retrieval_events import (
     NonTrayItemRetrievalEventDetailOutput,
 )
 from app.config.exceptions import NotFound
+from app.permissions import require_permissions
 
 
 router = APIRouter(
@@ -75,6 +76,7 @@ def get_non_tray_item_retrieval_event_detail(
 def create_non_tray_item_retrieval_event(
     non_tray_item_retrieval_event: NonTrayItemRetrievalEventInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Create a new non tray item retrieval event.
@@ -105,6 +107,7 @@ def update_non_tray_item_retrieval_event(
     id: int,
     non_tray_item_retrieval_event: NonTrayItemRetrievalEventUpdateInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Update a non tray item retrieval event by its ID.
@@ -140,7 +143,8 @@ def update_non_tray_item_retrieval_event(
 
 @router.delete("/{id}")
 def delete_non_tray_item_retrieval_event(
-    id: int, session: Session = Depends(get_session)
+    id: int, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Delete a non tray item retrieval event by its ID.

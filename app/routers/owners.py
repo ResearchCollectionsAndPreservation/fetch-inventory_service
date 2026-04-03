@@ -8,6 +8,7 @@ from fastapi_pagination.ext.sqlmodel import paginate
 from sqlalchemy.exc import IntegrityError
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.filter_params import SortParams
 from app.models.owners import Owner
 from app.models.owner_tiers import OwnerTier
@@ -40,6 +41,7 @@ def get_owner_list(
     parent_owner: Optional[str] = Query(None),
     sort_params: SortParams = Depends(),
     search: Optional[str] = Query(None, description="Search by Owner name"),
+    _: bool = Depends(require_permissions("can_manage_owners"))
 ) -> list:
     """
     Get a list of owners.
@@ -81,7 +83,7 @@ def get_owner_list(
 
 
 @router.get("/{id}", response_model=OwnerDetailReadOutput)
-def get_owner_detail(id: int, session: Session = Depends(get_session)):
+def get_owner_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_owners"))):
     """
     Retrieve owner details by ID.
 
@@ -103,7 +105,7 @@ def get_owner_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=OwnerDetailWriteOutput, status_code=201)
 def create_owner(
-    owner_input: OwnerInput, session: Session = Depends(get_session)
+    owner_input: OwnerInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_owners"))
 ) -> Owner:
     """
     Create an owner:
@@ -161,7 +163,7 @@ def create_owner(
 
 @router.patch("/{id}", response_model=OwnerDetailWriteOutput)
 def update_owner(
-    id: int, owner: OwnerUpdateInput, session: Session = Depends(get_session)
+    id: int, owner: OwnerUpdateInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_owners"))
 ):
     """
     Update an existing owner.
@@ -215,7 +217,7 @@ def update_owner(
 
 
 @router.delete("/{id}")
-def delete_owner(id: int, session: Session = Depends(get_session)):
+def delete_owner(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_owners"))):
     """
     Delete an owner by their ID.
 

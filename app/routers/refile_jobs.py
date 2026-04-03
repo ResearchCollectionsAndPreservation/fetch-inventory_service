@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 from sqlalchemy import func, distinct, case, literal_column
 
 from app.database.session import get_session, commit_record
+from app.permissions import require_permissions
 from app.filter_params import SortParams, JobFilterParams
 from app.models.barcodes import Barcode
 from app.models.items import Item
@@ -128,6 +129,7 @@ def get_refile_job_list(
     session: Session = Depends(get_session),
     params: JobFilterParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_refile")),
 ) -> list:
     """
     Get a list of refile jobs
@@ -185,7 +187,11 @@ def get_refile_job_list(
 
 
 @router.get("/{id}", response_model=RefileJobDetailOutput)
-def get_refile_job_detail(id: int, session: Session = Depends(get_session)):
+def get_refile_job_detail(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_refile")),
+):
     """
     Retrieve refile job details by ID.
 
@@ -211,7 +217,9 @@ def get_refile_job_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=RefileJobDetailOutput, status_code=201)
 def create_refile_job(
-    refile_job_input: RefileJobInput, session: Session = Depends(get_session)
+    refile_job_input: RefileJobInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_create_refile_job")),
 ):
     """
     Create a new refile job.
@@ -338,7 +346,10 @@ def create_refile_job(
 
 @router.patch("/{id}", response_model=RefileJobDetailOutput)
 def update_refile_job(
-    id: int, refile_job: RefileJobUpdateInput, session: Session = Depends(get_session)
+    id: int,
+    refile_job: RefileJobUpdateInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_edit_refile_job")),
 ):
     """
     Update an existing refile job.
@@ -378,7 +389,11 @@ def update_refile_job(
 
 
 @router.delete("/{id}")
-def delete_refile_job(id: int, session: Session = Depends(get_session)):
+def delete_refile_job(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_delete_refile_job")),
+):
     """
     Delete a refile job by ID.
 
@@ -457,6 +472,7 @@ def add_items_to_refile_job(
     job_id: int,
     refile_job_input: RefileJobInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_add_to_refile_job")),
 ):
     """
     Add an item to a refile job.
@@ -593,6 +609,7 @@ def remove_item_from_refile_job(
     job_id: int,
     refile_job_input: RefileJobInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_edit_refile_job")),
 ):
     """
     Remove an item from a refile job.
@@ -690,6 +707,7 @@ def update_item_in_refile_job(
     item_id: int,
     refile_job_item_input: ItemUpdateInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_edit_refile_job")),
 ):
     """
     Update an item in a refile job.
@@ -745,6 +763,7 @@ def update_non_tray_item_in_refile_job(
     non_tray_item_id: int,
     refile_job_non_tray_item_input: NonTrayItemUpdateInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_edit_refile_job")),
 ):
     """
     Update a Non Tray item in a refile job.

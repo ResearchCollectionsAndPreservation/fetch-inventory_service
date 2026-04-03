@@ -43,6 +43,16 @@ def complete_accession_job(accession_job: AccessionJob, original_status, audit_i
         accession_job.last_transition = datetime.now(timezone.utc)
         commit_record(session, accession_job)
 
+        # Guard: check if verification job already exists for this workflow
+        existing_verification_job = session.exec(
+            select(VerificationJob).where(VerificationJob.workflow_id == accession_job.workflow_id)
+        ).first()
+        if existing_verification_job:
+            inventory_logger.warning(
+                f"Verification job already exists for workflow {accession_job.workflow_id}, skipping creation"
+            )
+            return
+
         verification_job_input = VerificationJobInput(
             accession_job_id=accession_job.id,
             workflow_id=accession_job.workflow_id,

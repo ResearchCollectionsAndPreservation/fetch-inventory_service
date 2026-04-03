@@ -6,6 +6,7 @@ from sqlmodel import Session, select
 
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.config.exceptions import (
     NotFound,
     ValidationException,
@@ -34,6 +35,7 @@ def get_audit_trails_list(
     table_names: Optional[list[str]] = Query(default=None),
     sort_params: SortParams = Depends(),
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_reports")),
 ) -> list:
     """
     Get a paginated list of audit trails.
@@ -77,6 +79,7 @@ def get_audit_trails_detail_list(
     record_id: str,
     sort_params: SortParams = Depends(),
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_reports")),
 ):
     """
     Get a detailed list of audit trails for a specific record.

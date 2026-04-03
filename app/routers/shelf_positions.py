@@ -24,6 +24,7 @@ from app.config.exceptions import (
     InternalServerError,
 )
 from app.sorting import BaseSorter, ShelvesSorter
+from app.permissions import require_permissions
 
 router = APIRouter(
     prefix="/shelves/positions",
@@ -38,6 +39,7 @@ def get_shelf_position_list(
     empty: bool | None = False,
     sort_params: SortParams = Depends(),
     search: Optional[str] = Query(None, description="Search by Shelf position number"),
+    _: bool = Depends(require_permissions("can_access_shelving", "can_move_trays_and_items_shelving_locations", any_of=True)),
 ) -> list:
     """
     Retrieve a list of shelf positions.
@@ -84,7 +86,7 @@ def get_shelf_position_list(
 
 
 @router.get("/{id}", response_model=ShelfPositionDetailReadOutput)
-def get_shelf_position_detail(id: int, session: Session = Depends(get_session)):
+def get_shelf_position_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_access_shelving", "can_move_trays_and_items_shelving_locations", any_of=True))):
     """
     Retrieve a shelf position detail by its ID.
 
@@ -109,6 +111,7 @@ def get_shelf_position_detail(id: int, session: Session = Depends(get_session)):
 def create_shelf_position(
     shelf_position_input: ShelfPositionInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ) -> ShelfPosition:
     """
     Create a new shelf position.
@@ -160,6 +163,7 @@ def update_shelf_position(
     id: int,
     shelf_position: ShelfPositionUpdateInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Update a shelf position with the given ID.
@@ -214,7 +218,7 @@ def update_shelf_position(
 
 
 @router.delete("/{id}")
-def delete_shelf_position(id: int, session: Session = Depends(get_session)):
+def delete_shelf_position(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Delete a shelf position by its ID.
 

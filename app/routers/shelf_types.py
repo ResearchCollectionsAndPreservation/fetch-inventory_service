@@ -10,6 +10,7 @@ from sqlalchemy import func
 
 # --- START: MODIFIED/NEW IMPORTS FOR BACKGROUND TASK ---
 from app.database.session import get_session, AppSessionLocal
+from app.permissions import require_permissions
 from app.filter_params import SortParams
 from app.models.shelf_types import ShelfType
 from app.models.shelves import Shelf
@@ -137,6 +138,7 @@ def get_shelf_type_list(
     size_class_id: int = None,
     sort_params: SortParams = Depends(),
     search: Optional[str] = Query(None, description="Search by Shelf Type Type"),
+    _: bool = Depends(require_permissions("can_manage_shelf_type"))
 ) -> list:
     # This function is unchanged from your original file.
     query = select(ShelfType)
@@ -151,7 +153,7 @@ def get_shelf_type_list(
 
 
 @router.get("/{id}", response_model=ShelfTypeDetailOutput)
-def get_shelf_type_detail(id: int, session: Session = Depends(get_session)):
+def get_shelf_type_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_shelf_type"))):
     # This function is unchanged from your original file.
     if not id:
         raise BadRequest(detail="Shelf Type ID Required")
@@ -163,7 +165,7 @@ def get_shelf_type_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=ShelfTypeDetailOutput)
 def create_shelf_type(
-    shelf_type_input: ShelfTypeInput, session: Session = Depends(get_session)
+    shelf_type_input: ShelfTypeInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_shelf_type"))
 ):
     # This function is unchanged from your original file.
     try:
@@ -181,8 +183,9 @@ def create_shelf_type(
 def update_shelf_type(
     id: int,
     shelf_type_input: ShelfTypeUpdateInput,
-    background_tasks: BackgroundTasks, # This dependency is new
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_shelf_type"))
 ):
     """
     Update an existing Shelf Type. If max_capacity is changed, a background
@@ -224,7 +227,7 @@ def update_shelf_type(
 
 
 @router.delete("/{id}")
-def delete_shelf_type(id: int, session: Session = Depends(get_session)):
+def delete_shelf_type(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_shelf_type"))):
     # This function is unchanged from your original file.
     if not id:
         raise BadRequest(detail="Shelf Type ID Required")
