@@ -1,3 +1,8 @@
+# Project Lineage
+
+This repository was initially derived from the [Library of Congress FETCH project](https://github.com/LibraryOfCongress). It is maintained independently and may diverge over time.
+
+At the time of import, LC maintained the canonical implementation with the following notice: 
 _At this time, LC does not have the resources to offer support for this open source code. While LC will make the code available, the Library does not currently promise to address any issues which are pointed out by the community beyond what is needed for the Library's own usage._
 
 # FETCH API
