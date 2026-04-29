@@ -27,6 +27,7 @@ from app.config.exceptions import (
     InternalServerError,
 )
 from app.sorting import BaseSorter
+from app.permissions import require_permissions
 
 router = APIRouter(
     prefix="/sides",
@@ -105,7 +106,7 @@ def get_side_detail(id: int, session: Session = Depends(get_session)):
 
 
 @router.post("/", response_model=SideDetailWriteOutput, status_code=201)
-def create_side(side_input: SideInput, session: Session = Depends(get_session)):
+def create_side(side_input: SideInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Create a new side record.
 
@@ -138,7 +139,8 @@ def create_side(side_input: SideInput, session: Session = Depends(get_session)):
 
 @router.patch("/{id}", response_model=SideDetailWriteOutput)
 def update_side(
-    id: int, side: SideUpdateInput, session: Session = Depends(get_session)
+    id: int, side: SideUpdateInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Update a side record in the database.
@@ -177,7 +179,7 @@ def update_side(
 
 
 @router.delete("/{id}")
-def delete_side(id: int, session: Session = Depends(get_session)):
+def delete_side(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Delete a side by its ID.
 

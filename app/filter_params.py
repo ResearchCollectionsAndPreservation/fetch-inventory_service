@@ -533,6 +533,28 @@ class BatchUploadParams:
         self.file_type = file_type
 
 
+class NotShelvedParams:
+    """
+    Query params for Not Shelved Report.
+    """
+
+    def __init__(
+        self,
+        container_type: str = Query(
+            ..., description="Container type: 'Tray', 'NonTray', or 'Both'"
+        ),
+        from_dt: datetime = Query(
+            ..., description="Start accession date to filter by."
+        ),
+        to_dt: datetime = Query(
+            ..., description="End accession date to filter by."
+        ),
+    ):
+        self.container_type = container_type
+        self.from_dt = from_dt
+        self.to_dt = to_dt
+
+
 class MoveDiscrepancyParams:
     def __init__(
         self,

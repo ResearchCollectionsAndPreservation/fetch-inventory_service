@@ -8,6 +8,7 @@ from fastapi_pagination.ext.sqlmodel import paginate
 from sqlalchemy.exc import IntegrityError
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.filter_params import SortParams
 from app.models.container_types import ContainerType
 
@@ -35,6 +36,7 @@ def get_container_type_list(
     session: Session = Depends(get_session),
     sort_params: SortParams = Depends(),
     search: Optional[str] = Query(None, description="Search by Container Type Type"),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ) -> list:
     """
     Retrieve a list of container types.
@@ -64,7 +66,11 @@ def get_container_type_list(
 
 
 @router.get("/{id}", response_model=ContainerTypeDetailReadOutput)
-def get_container_type_detail(id: int, session: Session = Depends(get_session)):
+def get_container_type_detail(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
+):
     """
     Retrieve details of a specific container type by ID.
 
@@ -86,7 +92,9 @@ def get_container_type_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=ContainerTypeDetailWriteOutput, status_code=201)
 def create_container_type(
-    container_type_input: ContainerTypeInput, session: Session = Depends(get_session)
+    container_type_input: ContainerTypeInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Create a new container type record.'
@@ -114,7 +122,10 @@ def create_container_type(
 
 @router.patch("/{id}", response_model=ContainerTypeDetailWriteOutput)
 def update_container_type(
-    id: int, container_type: ContainerTypeInput, session: Session = Depends(get_session)
+    id: int,
+    container_type: ContainerTypeInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Update an existing container type in the database.
@@ -150,7 +161,11 @@ def update_container_type(
 
 
 @router.delete("/{id}", status_code=204)
-def delete_container_type(id: int, session: Session = Depends(get_session)):
+def delete_container_type(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
+):
     """
     Deletes a container type from the database by its ID.
 

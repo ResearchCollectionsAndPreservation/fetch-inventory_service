@@ -10,6 +10,7 @@ from sqlmodel import Session, select
 from datetime import datetime, timezone
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.filter_params import SortParams
 from app.models.groups import Group
 from app.models.users import User
@@ -103,7 +104,11 @@ def get_user_groups(id: int, session: Session = Depends(get_session)):
 
 
 @router.post("/", response_model=UserDetailWriteOutput, status_code=201)
-def create_user(user_input: UserInput, session: Session = Depends(get_session)):
+def create_user(
+    user_input: UserInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_users")),
+):
     """
     Create a new user.
 
@@ -124,7 +129,10 @@ def create_user(user_input: UserInput, session: Session = Depends(get_session)):
 
 @router.patch("/{id}", response_model=UserDetailWriteOutput)
 def update_user(
-    id: int, user: UserUpdateInput, session: Session = Depends(get_session)
+    id: int,
+    user: UserUpdateInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_users")),
 ):
     """
     Updates a user with the given ID using the provided user data.
@@ -157,7 +165,11 @@ def update_user(
 
 
 @router.delete("/{id}")
-def delete_user(id: int, session: Session = Depends(get_session)):
+def delete_user(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_users")),
+):
     """
     Delete a user with the given id.
 

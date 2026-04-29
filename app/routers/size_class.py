@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from app.config.exceptions import BadRequest, InternalServerError
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.filter_params import SortParams
 from app.logger import inventory_logger
 from app.models.size_class import SizeClass
@@ -32,6 +33,7 @@ def get_size_class_list(
     short_name: str | None = None,
     sort_params: SortParams = Depends(),
     search: Optional[str] = Query(None),
+    _: bool = Depends(require_permissions("can_manage_size_class"))
 ) -> list:
     """
     Get a paginated list of size classes
@@ -67,7 +69,7 @@ def get_size_class_list(
 
 
 @router.get("/{id}", response_model=SizeClassDetailReadOutput)
-def get_size_class_detail(id: int, session: Session = Depends(get_session)):
+def get_size_class_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_size_class"))):
     """
     Retrieve the details of a size class by its ID.
     """
@@ -80,7 +82,7 @@ def get_size_class_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=SizeClassDetailWriteOutput, status_code=201)
 def create_size_class(
-    size_class_input: SizeClassInput, session: Session = Depends(get_session)
+    size_class_input: SizeClassInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_size_class"))
 ):
     """
     Create a new size class record.
@@ -99,6 +101,7 @@ def update_size_class(
     id: int,
     size_class_input: SizeClassUpdateInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_size_class"))
 ):
     """
     Update a size class record in the database
@@ -126,7 +129,7 @@ def update_size_class(
 
 
 @router.delete("/{id}")
-def delete_size_class(id: int, session: Session = Depends(get_session)):
+def delete_size_class(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_size_class"))):
     """
     Delete a size_class by its ID
     """

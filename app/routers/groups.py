@@ -6,6 +6,7 @@ from sqlalchemy import asc, desc
 from datetime import datetime, timezone
 
 from app.database.session import get_session, commit_record, remove_record
+from app.permissions import require_permissions, permissions_cache
 from app.filter_params import SortParams
 from app.models.groups import Group, GroupPermission
 from app.models.permissions import Permission
@@ -34,7 +35,8 @@ router = APIRouter(
 @router.get("/", response_model=Page[GroupListOutput])
 def get_group_list(
     session: Session = Depends(get_session),
-    sort_params: SortParams = Depends()
+    sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_manage_groups_and_permissions"))
 ) -> list:
     """
     Get a list of groups
@@ -59,7 +61,7 @@ def get_group_list(
 
 
 @router.get("/{id}", response_model=GroupDetailReadOutput)
-def get_group_detail(id: int, session: Session = Depends(get_session)):
+def get_group_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_groups_and_permissions"))):
     """
     Retrieve group by id
 
@@ -81,7 +83,7 @@ def get_group_detail(id: int, session: Session = Depends(get_session)):
 
 
 @router.post("/", response_model=GroupDetailWriteOutput, status_code=201)
-def create_group(group_input: GroupInput, session: Session = Depends(get_session)):
+def create_group(group_input: GroupInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_groups_and_permissions"))):
     """
     Create a new group
 
@@ -101,7 +103,7 @@ def create_group(group_input: GroupInput, session: Session = Depends(get_session
 
 @router.patch("/{id}", response_model=GroupDetailWriteOutput)
 def update_group(
-    id: int, group: GroupUpdateInput, session: Session = Depends(get_session)
+    id: int, group: GroupUpdateInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_groups_and_permissions"))
 ):
     """
     Update a group by id
@@ -136,7 +138,7 @@ def update_group(
 
 
 @router.delete("/{id}")
-def delete_group(id: int, session: Session = Depends(get_session)):
+def delete_group(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_groups_and_permissions"))):
     """
     Delete a group by id
 
@@ -160,7 +162,7 @@ def delete_group(id: int, session: Session = Depends(get_session)):
 
 
 @router.get("/{id}/users", response_model=GroupUserOutput)
-def get_group_users(id: int, session: Session = Depends(get_session)):
+def get_group_users(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_groups_and_permissions"))):
     """
     Retrieve list of users belonging to a group
 
@@ -182,7 +184,7 @@ def get_group_users(id: int, session: Session = Depends(get_session)):
 
 @router.post("/{group_id}/add_user/{user_id}", response_model=GroupUserOutput)
 def add_user_to_group(
-    group_id: int, user_id: int, session: Session = Depends(get_session)
+    group_id: int, user_id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_groups_and_permissions"))
 ):
     """
     Add a user to a group by group and user id
@@ -217,7 +219,7 @@ def add_user_to_group(
 
 @router.delete("/{group_id}/remove_user/{user_id}", response_model=GroupUserOutput)
 def remove_user_from_group(
-    group_id: int, user_id: int, session: Session = Depends(get_session)
+    group_id: int, user_id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_groups_and_permissions"))
 ):
     """
     Remove a user from a group, by group and user id
@@ -253,7 +255,7 @@ def remove_user_from_group(
 
 
 @router.get("/{group_id}/permissions", response_model=GroupPermissionsOutput)
-def get_group_permissions(group_id: int, session: Session = Depends(get_session)):
+def get_group_permissions(group_id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_groups_and_permissions"))):
     """
     Get a list of permissions for a group
 
@@ -279,7 +281,7 @@ def get_group_permissions(group_id: int, session: Session = Depends(get_session)
     response_model=GroupPermissionsOutput,
 )
 def add_permission_to_group(
-    group_id: int, permission_id: int, session: Session = Depends(get_session)
+    group_id: int, permission_id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_groups_and_permissions"))
 ):
     """
     Add a permission to a group by group and permission id
@@ -315,6 +317,9 @@ def add_permission_to_group(
     commit_record(session, new_group_permission)
     session.refresh(group)
 
+    # Invalidate permissions cache so changes take effect immediately
+    permissions_cache.refresh_if_needed(force=True)
+
     return group
 
 
@@ -323,7 +328,7 @@ def add_permission_to_group(
     response_model=GroupPermissionsOutput,
 )
 def remove_permission_from_group(
-    group_id: int, permission_id: int, session: Session = Depends(get_session)
+    group_id: int, permission_id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_groups_and_permissions"))
 ):
     """
     Remove a permission from a group, by group and permission id
@@ -363,5 +368,8 @@ def remove_permission_from_group(
 
     remove_record(session, group_permission)
     session.refresh(group)
+
+    # Invalidate permissions cache so changes take effect immediately
+    permissions_cache.refresh_if_needed(force=True)
 
     return group

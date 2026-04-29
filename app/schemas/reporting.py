@@ -248,6 +248,13 @@ class RetrievalItemCountReadOutput(BaseModel):
         }
 
 
+class NotShelvedOutput(BaseModel):
+    barcode_value: Optional[str] = None
+    owner_name: Optional[str] = None
+    workflow_id: Optional[int] = None
+    accession_dt: Optional[datetime] = None
+
+
 class MoveDiscrepancyBaseOutput(BaseModel):
     id: int
     tray_id: Optional[int] = None

@@ -8,6 +8,7 @@ from fastapi_pagination.ext.sqlmodel import paginate
 from sqlalchemy.exc import IntegrityError
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.filter_params import SortParams, LadderFilterParams
 from app.models.buildings import Building
 from app.models.modules import Module
@@ -41,6 +42,7 @@ def get_ladder_list(
     params: LadderFilterParams = Depends(),
     sort_params: SortParams = Depends(),
     search: Optional[str] = Query(None, description="Search by Ladder Number"),
+    _: bool = Depends(require_permissions("can_manage_locations"))
 ) -> list:
     """
     Retrieve a paginated list of ladders.
@@ -90,6 +92,7 @@ def get_ladder_list(
 def get_ladder_detail(
     id: int,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations"))
 ):
     """
     Retrieve the details of a ladder by its ID.
@@ -118,7 +121,7 @@ def get_ladder_detail(
 
 @router.post("/", response_model=LadderDetailWriteOutput, status_code=201)
 def create_ladder(
-    ladder_input: LadderInput, session: Session = Depends(get_session)
+    ladder_input: LadderInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))
 ) -> Ladder:
     """
     Create a ladder:
@@ -172,7 +175,7 @@ def create_ladder(
 
 @router.patch("/{id}", response_model=LadderDetailWriteOutput)
 def update_ladder(
-    id: int, ladder: LadderUpdateInput, session: Session = Depends(get_session)
+    id: int, ladder: LadderUpdateInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))
 ):
     """
     Update a ladder with the given ID.
@@ -212,7 +215,7 @@ def update_ladder(
 
 
 @router.delete("/{id}")
-def delete_ladder(id: int, session: Session = Depends(get_session)):
+def delete_ladder(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Delete a ladder with the given ID.
 

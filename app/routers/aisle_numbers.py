@@ -19,6 +19,7 @@ from app.schemas.aisle_numbers import (
     AisleNumberDetailOutput,
 )
 from app.sorting import BaseSorter
+from app.permissions import require_permissions
 
 router = APIRouter(
     prefix="/aisles",
@@ -29,7 +30,8 @@ router = APIRouter(
 @router.get("/numbers", response_model=Page[AisleNumberListOutput])
 def get_aisle_number_list(
     session: Session = Depends(get_session),
-    sort_params: SortParams = Depends()
+    sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ) -> list:
     """
     Retrieve a paginated list of aisle numbers.
@@ -52,7 +54,7 @@ def get_aisle_number_list(
 
 
 @router.get("/numbers/{id}", response_model=AisleNumberDetailOutput)
-def get_aisle_number_detail(id: int, session: Session = Depends(get_session)):
+def get_aisle_number_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Retrieves the aisle number detail for the given ID.
 
@@ -74,7 +76,8 @@ def get_aisle_number_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/numbers", response_model=AisleNumberDetailOutput, status_code=201)
 def create_aisle_number(
-    aisle_number_input: AisleNumberInput, session: Session = Depends(get_session)
+    aisle_number_input: AisleNumberInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ) -> AisleNumber:
     """
     Create a new aisle number:
@@ -105,7 +108,8 @@ def create_aisle_number(
 
 @router.patch("/numbers/{id}", response_model=AisleNumberDetailOutput)
 def update_aisle_number(
-    id: int, aisle_number: AisleNumberInput, session: Session = Depends(get_session)
+    id: int, aisle_number: AisleNumberInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
 
     try:
@@ -132,7 +136,7 @@ def update_aisle_number(
 
 
 @router.delete("/numbers/{id}")
-def delete_aisle_number(id: int, session: Session = Depends(get_session)):
+def delete_aisle_number(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Delete an aisle number by its ID.
 

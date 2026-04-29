@@ -20,6 +20,7 @@ from app.config.exceptions import (
     InternalServerError,
 )
 from app.sorting import BaseSorter
+from app.permissions import require_permissions
 
 router = APIRouter(
     prefix="/owners",
@@ -75,7 +76,8 @@ def get_owner_tier_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/tiers", response_model=OwnerTierDetailOutput, status_code=201)
 def create_owner_tier(
-    owner_tier_input: OwnerTierInput, session: Session = Depends(get_session)
+    owner_tier_input: OwnerTierInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_owners")),
 ) -> OwnerTier:
     """
     Create an owner tier:
@@ -108,7 +110,8 @@ def create_owner_tier(
 
 @router.patch("/tiers/{id}", response_model=OwnerTierDetailOutput)
 def update_owner_tier(
-    id: int, owner_tier: OwnerTierUpdateInput, session: Session = Depends(get_session)
+    id: int, owner_tier: OwnerTierUpdateInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_owners")),
 ):
     """
     Update an owner tier by its ID.
@@ -143,7 +146,7 @@ def update_owner_tier(
 
 
 @router.delete("/tiers/{id}")
-def delete_owner_tier(id: int, session: Session = Depends(get_session)):
+def delete_owner_tier(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_owners"))):
     """
     Delete an owner tier by its ID.
 

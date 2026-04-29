@@ -19,6 +19,7 @@ from app.config.exceptions import (
     InternalServerError,
 )
 from app.sorting import BaseSorter
+from app.permissions import require_permissions
 
 router = APIRouter(
     prefix="/ladders",
@@ -77,7 +78,8 @@ def get_ladder_number_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/numbers", response_model=LadderNumberDetailOutput, status_code=201)
 def create_ladder_number(
-    ladder_number_input: LadderNumberInput, session: Session = Depends(get_session)
+    ladder_number_input: LadderNumberInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ) -> LadderNumber:
     """
     Create a ladder number:
@@ -106,7 +108,8 @@ def create_ladder_number(
 
 @router.patch("/numbers/{id}", response_model=LadderNumberDetailOutput)
 def update_ladder_number(
-    id: int, ladder_number: LadderNumberInput, session: Session = Depends(get_session)
+    id: int, ladder_number: LadderNumberInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Updates a ladder number with the provided input data.
@@ -140,7 +143,7 @@ def update_ladder_number(
         raise InternalServerError(detail=f"{e}")
 
 @router.delete("/numbers/{id}")
-def delete_ladder_number(id: int, session: Session = Depends(get_session)):
+def delete_ladder_number(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Deletes a ladder number from the database.
 

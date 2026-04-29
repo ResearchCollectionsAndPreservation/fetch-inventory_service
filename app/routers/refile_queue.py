@@ -8,6 +8,7 @@ from sqlmodel import Session, select
 from starlette import status
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.logger import inventory_logger
 from app.models.barcodes import Barcode
 from app.models.items import Item
@@ -40,7 +41,8 @@ router = APIRouter(
 def get_refile_queue_list(
     params: RefileQueueParams = Depends(),
     session: Session = Depends(get_session),
-    sort_params: SortParams = Depends()
+    sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_refile")),
 ) -> list:
     """
     Get a list of refile jobs
@@ -64,7 +66,9 @@ def get_refile_queue_list(
 
 @router.patch("/", response_model=RefileQueueWriteOutput)
 def add_to_refile_queue(
-    refile_input: RefileQueueInput, session: Session = Depends(get_session)
+    refile_input: RefileQueueInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_add_refile_item_to_queue")),
 ):
     """
     Add an item to the refile queue
@@ -218,7 +222,9 @@ def add_to_refile_queue(
 
 @router.delete("/")
 def remove_from_refile_queue(
-    refile_input: RefileQueueInput, session: Session = Depends(get_session)
+    refile_input: RefileQueueInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_add_refile_item_to_queue")),
 ):
     """
     Remove an item from the refile queue
