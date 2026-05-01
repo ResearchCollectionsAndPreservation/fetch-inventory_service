@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 
 from app.config.exceptions import BadRequest, NotFound
 from app.database.session import get_session, commit_record
+from app.permissions import require_permissions
 from app.filter_params import SortParams
 from app.models.verification_changes import VerificationChange
 from app.schemas.verification_changes import (
@@ -26,7 +27,8 @@ router = APIRouter(
 @router.get("/", response_model=Page[VerificationChangeListOutput])
 def get_verification_change_list(
     session: Session = Depends(get_session),
-    sort_params: SortParams = Depends()
+    sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_verification")),
 ) -> list:
     """
     Retrieve a paginated list of verification changes.
@@ -44,7 +46,11 @@ def get_verification_change_list(
 
 
 @router.get("/{id}", response_model=VerificationChangeDetailOutput)
-def get_verification_change_detail(id: int, session: Session = Depends(get_session)):
+def get_verification_change_detail(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_verification")),
+):
     """
     Retrieves the verification job detail for the given workflow ID.
 
@@ -72,6 +78,7 @@ def get_verification_change_detail(id: int, session: Session = Depends(get_sessi
 def create_verification_change(
     verification_change_input: VerificationChangeInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_verification")),
 ):
     """
     Create a new verification change:
@@ -97,6 +104,7 @@ def update_verification_change(
     id: int,
     verification_change: VerificationChangeUpdateInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_verification")),
 ):
     """
     Update a verification change:
@@ -129,7 +137,11 @@ def update_verification_change(
 
 
 @router.delete("/{id}", status_code=204)
-def delete_verification_change(id: int, session: Session = Depends(get_session)):
+def delete_verification_change(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_verification")),
+):
     """
     Delete a verification change by its ID.
 

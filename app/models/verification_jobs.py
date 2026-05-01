@@ -37,7 +37,9 @@ class VerificationJob(SQLModel, table=True):
     __tablename__ = "verification_jobs"
 
     id: Optional[int] = Field(sa_column=sa.Column(sa.BigInteger, primary_key=True), default=None)
-    workflow_id: Optional[int] = Field(foreign_key="workflow.id", nullable=True)
+    workflow_id: Optional[int] = Field(
+        sa_column=sa.Column(sa.BigInteger, sa.ForeignKey("workflow.id"), nullable=True, unique=True)
+    )
     trayed: bool = Field(sa_column=sa.Column(sa.Boolean, default=True, nullable=False))
     status: str = Field(
         sa_column=sa.Column(

@@ -4,12 +4,14 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlmodel import paginate
+from sqlalchemy import or_
 from sqlmodel import Session, select
 from datetime import datetime, timezone
 
 from starlette.responses import StreamingResponse
 
 from app.database.session import get_session, commit_record
+from app.permissions import require_permissions
 from app.events import update_shelf_space_after_non_tray
 from app.filter_params import SortParams
 from app.logger import inventory_logger
@@ -52,6 +54,7 @@ def get_non_tray_item_list(
     session: Session = Depends(get_session),
     params: ItemFilterParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_item_detail")),
 ) -> list:
     """
     Get a paginated list of non tray items from the database
@@ -114,6 +117,7 @@ def get_non_tray_item_list(
 def download_non_tray_items(
     session: Session = Depends(get_session),
     params: ItemFilterParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_item_detail")),
 ):
     """
     Get a paginated list of non tray items from the database
@@ -184,7 +188,11 @@ def download_non_tray_items(
     )
 
 @router.get("/{id}", response_model=NonTrayItemDetailReadOutput)
-def get_non_tray_item_detail(id: int, session: Session = Depends(get_session)):
+def get_non_tray_item_detail(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_item_detail")),
+):
     """
     Retrieve the details of a non_tray_item by its ID
     """
@@ -197,7 +205,11 @@ def get_non_tray_item_detail(id: int, session: Session = Depends(get_session)):
 
 
 @router.get("/barcode/{value}", response_model=NonTrayItemDetailReadOutput)
-def get_non_tray_by_barcode_value(value: str, session: Session = Depends(get_session)):
+def get_non_tray_by_barcode_value(
+    value: str,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_item_detail")),
+):
     """
     Retrieve a non-tray using a barcode value
 
@@ -220,7 +232,9 @@ def get_non_tray_by_barcode_value(value: str, session: Session = Depends(get_ses
 
 @router.post("/", response_model=NonTrayItemDetailWriteOutput, status_code=201)
 def create_non_tray_item(
-    item_input: NonTrayItemInput, session: Session = Depends(get_session)
+    item_input: NonTrayItemInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_accession")),
 ):
     """
     Create a new non_tray_item record
@@ -255,7 +269,10 @@ def create_non_tray_item(
     # check if existing withdrawn non-tray with this barcode
     previous_non_tray_item = session.exec(
         select(NonTrayItem).where(
-            NonTrayItem.barcode_id == new_non_tray_item.barcode_id
+            or_(
+                NonTrayItem.barcode_id == new_non_tray_item.barcode_id,
+                NonTrayItem.withdrawn_barcode_id == new_non_tray_item.barcode_id,
+            )
         )
     ).first()
     if previous_non_tray_item:
@@ -266,7 +283,7 @@ def create_non_tray_item(
         new_non_tray_item.scanned_for_verification = False
         new_non_tray_item.scanned_for_shelving = False
         new_non_tray_item.scanned_for_refile_queue = False
-        barcode = select(Barcode).where(Barcode.id == new_non_tray_item.barcode_id)
+        barcode = session.exec(select(Barcode).where(Barcode.id == new_non_tray_item.barcode_id)).first()
         barcode.withdrawn = False
         session.add(barcode)
 
@@ -285,6 +302,7 @@ def update_non_tray_item(
     non_tray_item: NonTrayItemUpdateInput,
     session: Session = Depends(get_session),
     background_tasks: BackgroundTasks = None,
+    _: bool = Depends(require_permissions("can_access_accession", "can_access_verification", any_of=True)),
 ):
     """
     Update a non_tray_item record in the database
@@ -379,7 +397,11 @@ def update_non_tray_item(
 
 
 @router.delete("/{id}")
-def delete_non_tray_item(id: int, session: Session = Depends(get_session)):
+def delete_non_tray_item(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_accession")),
+):
     """
     Delete a non_tray_item by its ID
     """
@@ -402,6 +424,7 @@ def move_item(
     barcode_value: str,
     non_tray_item_input: NonTrayItemMoveInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_move_trays_and_items")),
 ):
     """
     Move a non_tray_item from one location to another.

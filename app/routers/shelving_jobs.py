@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 
 from app.database.session import get_session, commit_record
+from app.permissions import require_permissions
 from app.filter_params import SortParams, JobFilterParams
 from app.logger import inventory_logger
 from app.models.accession_jobs import AccessionJob, AccessionJobStatus
@@ -88,6 +89,7 @@ def get_shelving_job_list(
     session: Session = Depends(get_session),
     params: JobFilterParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_shelving")),
 ) -> list:
     """
     Retrieve a paginated list of shelving jobs.
@@ -158,7 +160,11 @@ def get_shelving_job_list(
 
 
 @router.get("/{id}", response_model=ShelvingJobDetailOutput)
-def get_shelving_job_detail(id: int, session: Session = Depends(get_session)):
+def get_shelving_job_detail(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_shelving")),
+):
     """
     Retrieves the shelving job detail for the given ID.
 
@@ -187,6 +193,7 @@ def create_shelving_job(
     side_id: int | None = None,
     ladder_id: int | None = None,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_create_and_execute_shelving_job")),
 ) -> ShelvingJob:
     """
     Create a new shelving job:
@@ -297,6 +304,7 @@ def update_shelving_job(
     id: int,
     shelving_job: ShelvingJobUpdateInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_create_and_execute_shelving_job")),
 ):
     """
     Update an existing shelving job with the provided data.
@@ -340,7 +348,11 @@ def update_shelving_job(
 
 
 @router.delete("/{id}", status_code=204)
-def delete_shelving_job(id: int, session: Session = Depends(get_session)):
+def delete_shelving_job(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_create_and_execute_shelving_job")),
+):
     """
     Delete a shelving job by its ID.
     **Args:**
@@ -436,6 +448,7 @@ def reassign_container_location(
     id: int,
     reassignment_input: ReAssignmentInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_move_trays_and_items", "can_create_and_execute_direct_shelving_job", any_of=True)),
 ):
     """
     Re-Assign container shelf position, given a container id,
@@ -760,6 +773,7 @@ def reassign_container_proposed_location(
     id: int,
     reassignment_input: ProposedReAssignmentInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_move_trays_and_items_shelving_locations")),
 ):
     shelving_job = session.get(ShelvingJob, id)
     shelf_id = None

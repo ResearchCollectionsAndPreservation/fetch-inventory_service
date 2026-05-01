@@ -10,6 +10,7 @@ from fastapi_pagination import paginate as paginate_list
 from fastapi_pagination.ext.sqlmodel import paginate
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.filter_params import SortParams
 from app.models.owners import Owner
 from app.models.shelf_types import ShelfType
@@ -52,6 +53,7 @@ def get_shelf_list(
     params: ShelfFilterParams = Depends(),
     sort_params: SortParams = Depends(),
     search: Optional[str] = Query(None, description="Search by Shelf location"),
+    _: bool = Depends(require_permissions("can_manage_locations"))
 ) -> list:
     """
     Get a list of shelves.
@@ -159,7 +161,7 @@ def get_shelf_list(
 
 
 @router.get("/{id}", response_model=ShelfDetailReadOutput)
-def get_shelf_detail(id: int, session: Session = Depends(get_session)):
+def get_shelf_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Retrieves the details of a shelf with the given ID.
 
@@ -181,7 +183,7 @@ def get_shelf_detail(id: int, session: Session = Depends(get_session)):
 
 
 @router.get("/barcode/{value}", response_model=ShelfDetailReadOutput)
-def get_shelf_by_barcode_value(value: str, session: Session = Depends(get_session)):
+def get_shelf_by_barcode_value(value: str, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Retrieve a shelf using a barcode value
 
@@ -197,7 +199,7 @@ def get_shelf_by_barcode_value(value: str, session: Session = Depends(get_sessio
 
 @router.get("/barcode/{value}/shelved", response_model=Page[dict])
 def get_shelved_entities_by_shelf_barcode_value(
-    value: str, session: Session = Depends(get_session)
+    value: str, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))
 ):
     """
     Retrieve tray and non_tray barcode list from things on a shelf
@@ -237,11 +239,15 @@ def get_shelved_entities_by_shelf_barcode_value(
 
     results = []
     for shelf_position in shelf_positions:
+        # Get the position number from the related shelf_position_number object.
+        position_number = shelf_position.shelf_position_number.number
+
         if shelf_position.id in trays:
             results.append(
                 {
                     "type": "tray",
                     "barcode_value": trays[shelf_position.id].barcode.value,
+                    "shelf_position_number": position_number, # <-- ADD THIS LINE
                 }
             )
         elif shelf_position.id in non_trays:
@@ -249,36 +255,30 @@ def get_shelved_entities_by_shelf_barcode_value(
                 {
                     "type": "non_tray",
                     "barcode_value": non_trays[shelf_position.id].barcode.value,
+                    "shelf_position_number": position_number, # <-- AND THIS LINE
                 }
             )
 
     return paginate_list(results)
 
 
+# Replace your existing create_shelf function with this one
+
 @router.post("/", response_model=ShelfDetailWriteOutput, status_code=201)
 def create_shelf(
-    shelf_input: ShelfInput, session: Session = Depends(get_session)
+    shelf_input: ShelfInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))
 ) -> Shelf:
     """
-    Create a shelf:
+    Create a shelf and efficiently bulk-creates its associated shelf positions.
 
     **Args:**
     - Shelf Input: The input data for creating the shelf.
 
     **Returns:**
     - Shelf Detail Write Output: The newly created shelf.
-
-    **Notes:**
-    - **ladder_id**: Required integer id for parent ladder
-    - **container_type_id**: Required integer id for related container type
-    - **shelf_number_id**: Required integer id for related shelf number
-    - **barcode_id**: Optional uuid for related barcode
-    - **height**: Required numeric (scale 4, precision 2) height in inches
-    - **width**: Required numeric (scale 4, precision 2) width in inches
-    - **depth**: Required numeric (scale 4, precision 2) depth in inches
     """
     try:
-        # Check if shelf # or shelf_number_id
+        # --- (Initial setup code is the same) ---
         shelf_number = shelf_input.shelf_number
         shelf_number_id = shelf_input.shelf_number_id
         mutated_data = shelf_input.model_dump(exclude="shelf_number")
@@ -286,58 +286,63 @@ def create_shelf(
 
         if not shelf_number_id and not shelf_number:
             raise ValidationException(
-                detail=f"shelf_number_id OR shelf_number required"
+                detail="shelf_number_id OR shelf_number required"
             )
         elif shelf_number and not shelf_number_id:
-            # get shelf_number_id from shelf number
-            shelf_num_object = (
-                session.query(ShelfNumber)
-                .filter(ShelfNumber.number == shelf_number)
-                .first()
-            )
+            shelf_num_object = session.exec(select(ShelfNumber).where(ShelfNumber.number == shelf_number)).first()
             if not shelf_num_object:
                 raise ValidationException(
                     detail=f"No shelf_number entity exists for shelf number {shelf_number}"
                 )
             mutated_data["shelf_number_id"] = shelf_num_object.id
 
-        # new_shelf = Shelf(**shelf_input.model_dump())
         new_shelf = Shelf(**mutated_data)
         session.add(new_shelf)
         session.commit()
         session.refresh(new_shelf)
 
-        shelf_type = (
-            session.query(ShelfType)
-            .filter(ShelfType.id == new_shelf.shelf_type_id)
-            .first()
-        )
+        shelf_type = session.get(ShelfType, new_shelf.shelf_type_id)
+        if not shelf_type:
+             raise InternalServerError(detail=f"ShelfType ID {new_shelf.shelf_type_id} not found.")
+
+        # --- START: OPTIMIZED SHELF POSITION CREATION ---
+
+        # 1. Fetch all required ShelfPositionNumber objects in a single query.
+        required_numbers = list(range(1, shelf_type.max_capacity + 1))
+        position_numbers_query = select(ShelfPositionNumber).where(ShelfPositionNumber.number.in_(required_numbers))
+        
+        # 2. Create a dictionary map for instant O(1) lookups. This is much faster than list searching.
+        position_numbers_map = {p.number: p for p in session.exec(position_numbers_query).all()}
+
         shelf_position_list = []
-        for position in range(shelf_type.max_capacity):
-            shelf_position_number = (
-                session.query(ShelfPositionNumber)
-                .filter(ShelfPositionNumber.number == (position + 1))
-                .first()
-            )
-            new_shelf_position = {
+        for position_num in required_numbers:
+            # 3. Get the object from the local map instead of querying the database in a loop.
+            shelf_pos_num_obj = position_numbers_map.get(position_num)
+            
+            if not shelf_pos_num_obj:
+                raise InternalServerError(detail=f"ShelfPositionNumber for position {position_num} not found in database.")
+
+            shelf_position_list.append({
                 "shelf_id": new_shelf.id,
-                "shelf_position_number_id": shelf_position_number.id,
-            }
-            shelf_position_list.append(new_shelf_position)
+                "shelf_position_number_id": shelf_pos_num_obj.id,
+            })
 
-        # Convert dictionaries to ORM instances
-        shelf_positions_to_create: List[ShelfPosition] = [
-            ShelfPosition(**data) for data in shelf_position_list
-        ]
+        # --- END: OPTIMIZED SHELF POSITION CREATION ---
 
-        session.add_all(shelf_positions_to_create)
-        start_session_with_audit_info(audit_info, session)
-        session.commit()
-        # re-calc space. This is blocking, for now
-        new_shelf.calc_available_space(session=session)
-        session.add(new_shelf)
-        session.commit()
-        session.refresh(new_shelf)
+        if shelf_position_list:
+            shelf_positions_to_create: List[ShelfPosition] = [
+                ShelfPosition(**data) for data in shelf_position_list
+            ]
+            session.add_all(shelf_positions_to_create)
+            start_session_with_audit_info(audit_info, session)
+            session.commit()
+        
+        # Re-calculate available space.
+        if hasattr(new_shelf, 'calc_available_space'):
+            new_shelf.calc_available_space(session=session)
+            session.add(new_shelf)
+            session.commit()
+            session.refresh(new_shelf)
 
         return new_shelf
     except Exception as e:
@@ -346,18 +351,20 @@ def create_shelf(
 
 @router.patch("/{id}", response_model=ShelfDetailWriteOutput)
 def update_shelf(
-    id: int, shelf_input: ShelfUpdateInput, session: Session = Depends(get_session)
+    id: int, shelf_input: ShelfUpdateInput, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))
 ):
     """
     Update a shelf with the given ID.
+    If the shelf_type is changed, this will adjust the number of shelf positions
+    to match the new max_capacity, but only if the positions being removed are empty.
 
     **Args:**
     - id: The ID of the shelf to update.
     - Shelf Update Input: The updated shelf data.
 
     **Raises:**
-    - HTTPException: If the shelf with the given ID does not exist or if there is a
-    server error.
+    - HTTPException: If the shelf with the given ID does not exist.
+    - ValidationException: If attempting to downsize a shelf with occupied positions.
 
     **Returns:**
     - Shelf Detail Write Output: The updated shelf.
@@ -369,19 +376,100 @@ def update_shelf(
 
     mutated_data = shelf_input.model_dump(exclude_unset=True)
 
+    # --- START: LOGIC TO HANDLE SHELF CAPACITY CHANGES ---
+    
+    # Check if the shelf_type_id is being changed and is different from the current one.
+    if "shelf_type_id" in mutated_data and mutated_data["shelf_type_id"] != existing_shelf.shelf_type_id:
+        
+        # Get the old and new shelf type objects to compare their capacities.
+        old_shelf_type = session.get(ShelfType, existing_shelf.shelf_type_id)
+        new_shelf_type = session.get(ShelfType, mutated_data["shelf_type_id"])
+
+        if not new_shelf_type:
+            raise ValidationException(detail=f"New Shelf Type ID {mutated_data['shelf_type_id']} not found.")
+
+        old_capacity = old_shelf_type.max_capacity if old_shelf_type else 0
+        new_capacity = new_shelf_type.max_capacity
+
+        # --- PATH 1: DECREASING CAPACITY ---
+        if new_capacity < old_capacity:
+            # We need to remove positions, but first, we must verify they are empty.
+            num_to_remove = old_capacity - new_capacity
+
+            # Find the positions with the highest numbers to remove them.
+            # We need to join to sort by the actual position number.
+            positions_to_check_query = (
+                select(ShelfPosition)
+                .join(ShelfPositionNumber, ShelfPosition.shelf_position_number_id == ShelfPositionNumber.id)
+                .where(ShelfPosition.shelf_id == id)
+                .order_by(ShelfPositionNumber.number.desc())
+                .limit(num_to_remove)
+            )
+            positions_to_delete = session.exec(positions_to_check_query).all()
+            position_ids_to_delete = [p.id for p in positions_to_delete]
+
+            if position_ids_to_delete:
+                # Check for ANY trays or non-tray items in the positions slated for deletion.
+                # This is an efficient check that stops at the first occupied slot it finds.
+                occupied_tray = session.exec(select(Tray.id).where(Tray.shelf_position_id.in_(position_ids_to_delete)).limit(1)).first()
+                occupied_non_tray = session.exec(select(NonTrayItem.id).where(NonTrayItem.shelf_position_id.in_(position_ids_to_delete)).limit(1)).first()
+
+                if occupied_tray or occupied_non_tray:
+                    # An item exists! Block the update and throw a clear error.
+                    raise ValidationException(detail="Shelf is not Empty")
+
+                # If we reach here, the positions are empty and safe to delete.
+                for pos in positions_to_delete:
+                    session.delete(pos)
+        
+        # --- PATH 2: INCREASING CAPACITY ---
+        elif new_capacity > old_capacity:
+            # We need to add new empty positions.
+            # Fetch all required ShelfPositionNumber objects in one query to avoid N+1.
+            new_position_numbers_range = list(range(old_capacity + 1, new_capacity + 1))
+            
+            position_numbers_query = (
+                session.query(ShelfPositionNumber)
+                .filter(ShelfPositionNumber.number.in_(new_position_numbers_range))
+            )
+            position_numbers_map = {p.number: p for p in position_numbers_query.all()}
+
+            for position_num in new_position_numbers_range:
+                shelf_pos_num_obj = position_numbers_map.get(position_num)
+                if not shelf_pos_num_obj:
+                    raise InternalServerError(detail=f"ShelfPositionNumber for position {position_num} not found in database.")
+
+                new_position = ShelfPosition(
+                    shelf_id=id,
+                    shelf_position_number_id=shelf_pos_num_obj.id,
+                )
+                session.add(new_position)
+
+    # --- END: LOGIC TO HANDLE SHELF CAPACITY CHANGES ---
+
+    # Apply all other attribute changes from the request.
     for key, value in mutated_data.items():
         setattr(existing_shelf, key, value)
 
+    # Update the timestamp and commit all changes (deletes, adds, updates).
     setattr(existing_shelf, "update_dt", datetime.now(timezone.utc))
     session.add(existing_shelf)
     session.commit()
     session.refresh(existing_shelf)
 
+    # Re-calculate available space now that positions have changed.
+    # This might be a custom method on your Shelf model.
+    if hasattr(existing_shelf, 'calc_available_space'):
+        existing_shelf.calc_available_space(session=session)
+        session.add(existing_shelf)
+        session.commit()
+        session.refresh(existing_shelf)
+
     return existing_shelf
 
 
 @router.delete("/{id}")
-def delete_shelf(id: int, session: Session = Depends(get_session)):
+def delete_shelf(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Delete a shelf by its ID.
 

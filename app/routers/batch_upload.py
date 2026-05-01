@@ -14,6 +14,7 @@ from starlette import status
 from starlette.responses import JSONResponse, StreamingResponse
 
 from app.database.session import get_session, commit_record
+from app.permissions import require_permissions
 from app.filter_params import SortParams, BatchUploadParams
 
 from app.logger import inventory_logger
@@ -64,6 +65,7 @@ async def get_batch_upload(
     uploaded_by: str | None = None,
     params: BatchUploadParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_create_and_submit_batch_requests"))
 ) -> list:
     """
     Batch upload endpoint to process barcodes for different operations.
@@ -107,7 +109,7 @@ async def get_batch_upload(
 
 
 @router.get("/{id}", response_model=BatchUploadDetailOutput)
-async def get_batch_upload_detail(id: int, session: Session = Depends(get_session)):
+async def get_batch_upload_detail(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_create_and_submit_batch_requests"))):
     """
     Batch upload endpoint to process barcodes for different operations.
 
@@ -128,7 +130,7 @@ async def get_batch_upload_detail(id: int, session: Session = Depends(get_sessio
 
 
 @router.delete("/{id}", response_model=BatchUploadDetailOutput)
-async def delete_batch_upload(id: int, session: Session = Depends(get_session)):
+async def delete_batch_upload(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_create_and_submit_batch_requests"))):
     """
     Batch upload endpoint to process barcodes for different operations.
 
@@ -160,6 +162,7 @@ async def update_batch_upload(
     id: int,
     batch_upload: BatchUploadUpdateInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_create_and_submit_batch_requests"))
 ):
     """
     Batch upload endpoint to process barcodes for different operations.
@@ -193,7 +196,7 @@ async def update_batch_upload(
 
 @router.post("/request")
 async def batch_upload_request(
-    file: UploadFile, requested_by_id: int = Form(None), session: Session = Depends(get_session)
+    file: UploadFile, requested_by_id: int = Form(None), session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_create_and_submit_batch_requests"))
 ):
     """
     Batch upload endpoint to process barcodes for different operations.
@@ -349,7 +352,7 @@ async def batch_upload_request(
 
 @router.post("/withdraw-jobs/{job_id}")
 async def batch_upload_withdraw_job(
-    job_id: int, file: UploadFile, session: Session = Depends(get_session)
+    job_id: int, file: UploadFile, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_create_and_submit_batch_requests"))
 ):
     """
     Batch upload endpoint to process barcodes for different operations.
@@ -567,6 +570,7 @@ async def batch_upload_location_management(
     aisle_id: int = Form(),
     side_id: int = Form(),
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_create_and_submit_batch_requests"))
 ):
     """
     Batch upload endpoint to process barcodes for different operations.
@@ -883,38 +887,45 @@ async def batch_upload_location_management(
         session.add_all(shelves_bulk)
         session.commit()
 
+        # Collect all required position numbers across all shelves for a single batch query
+        all_required_numbers = set()
         for shelf in shelves_bulk:
-            shelf_type = shelf.shelf_type
-            max_capacity = shelf_type.max_capacity
+            max_capacity = shelf.shelf_type.max_capacity
+            all_required_numbers.update(range(1, max_capacity + 1))
 
-            # Create Shelf Positions
-            shelf_position_bulk = []
-            for index in range(1, max_capacity + 1):
-                shelf_position_number = (
-                    session.query(ShelfPositionNumber)
-                    .filter(ShelfPositionNumber.number == index)
-                    .first()
-                )
+        position_numbers_query = select(ShelfPositionNumber).where(
+            ShelfPositionNumber.number.in_(list(all_required_numbers))
+        )
+        position_numbers_map = {p.number: p for p in session.exec(position_numbers_query).all()}
 
-                if not shelf_position_number:
-                    shelf_position_number = ShelfPositionNumber(
-                        shelf_type_id=shelf_type.id, position_number=index
-                    )
-                    session.add(shelf_position_number)
-                    session.commit()
-                    session.refresh(shelf_position_number)
+        # Create shelf positions for each shelf
+        all_shelf_positions = []
+        for shelf in shelves_bulk:
+            max_capacity = shelf.shelf_type.max_capacity
+            required_numbers = list(range(1, max_capacity + 1))
 
-                shelf_position_bulk.append(
+            for position_num in required_numbers:
+                shelf_pos_num_obj = position_numbers_map.get(position_num)
+                if not shelf_pos_num_obj:
+                    raise InternalServerError(detail=f"ShelfPositionNumber for position {position_num} not found in database.")
+
+                all_shelf_positions.append(
                     ShelfPosition(
                         shelf_id=shelf.id,
-                        shelf_position_number_id=shelf_position_number.id,
+                        shelf_position_number_id=shelf_pos_num_obj.id,
                     )
                 )
 
-            session.add_all(shelf_position_bulk)
-            session.add(shelf)
-
+        if all_shelf_positions:
+            session.add_all(all_shelf_positions)
             session.commit()
+
+        # Re-calculate available space for each shelf
+        for shelf in shelves_bulk:
+            if hasattr(shelf, 'calc_available_space'):
+                shelf.calc_available_space(session=session)
+                session.add(shelf)
+        session.commit()
 
     return JSONResponse(
         status_code=status.HTTP_200_OK, content="Batch Upload Successful"

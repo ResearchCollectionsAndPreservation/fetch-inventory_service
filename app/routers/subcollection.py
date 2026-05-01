@@ -21,6 +21,7 @@ from app.config.exceptions import (
     InternalServerError,
 )
 from app.sorting import BaseSorter
+from app.permissions import require_permissions
 
 router = APIRouter(
     prefix="/subcollections",
@@ -69,7 +70,8 @@ def get_subcollection_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=SubcollectionDetailWriteOutput, status_code=201)
 def create_subcollection(
-    subcollection_input: SubcollectionInput, session: Session = Depends(get_session)
+    subcollection_input: SubcollectionInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Create a new subcollection
@@ -92,6 +94,7 @@ def update_subcollection(
     id: int,
     subcollection: SubcollectionUpdateInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Updates an subcollection with the given ID using the provided subcollection data
@@ -121,7 +124,7 @@ def update_subcollection(
 
 
 @router.delete("/{id}")
-def delete_subcollection(id: int, session: Session = Depends(get_session)):
+def delete_subcollection(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Delete an subcollection with the given id
     """

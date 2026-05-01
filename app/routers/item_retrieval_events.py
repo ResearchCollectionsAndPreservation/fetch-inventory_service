@@ -17,6 +17,7 @@ from app.schemas.item_retrieval_events import (
     ItemRetrievalEventDetailOutput,
 )
 from app.config.exceptions import NotFound
+from app.permissions import require_permissions
 
 
 router = APIRouter(
@@ -76,6 +77,7 @@ def get_item_retrieval_event_detail(
 def create_item_retrieval_event(
     item_retrieval_event: ItemRetrievalEventInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Create a new item retrieval even.
@@ -104,6 +106,7 @@ def update_item_retrieval_event(
     id: int,
     item_retrieval_event: ItemRetrievalEventUpdateInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Update a item retrieval even by its ID.
@@ -138,7 +141,7 @@ def update_item_retrieval_event(
 
 
 @router.delete("/{id}")
-def delete_item_retrieval_event(id: int, session: Session = Depends(get_session)):
+def delete_item_retrieval_event(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Delete an item retrieval event by its ID.
 

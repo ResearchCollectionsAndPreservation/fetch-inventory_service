@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from sqlalchemy.exc import IntegrityError
 
 from app.database.session import get_session, commit_record
+from app.permissions import require_permissions
 from app.filter_params import SortParams, JobFilterParams
 from app.models.accession_jobs import AccessionJob
 from app.models.barcodes import Barcode
@@ -40,7 +41,8 @@ router = APIRouter(
 def get_accession_job_list(
     session: Session = Depends(get_session),
     params: JobFilterParams = Depends(),
-    sort_params: SortParams = Depends()
+    sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_accession")),
 ) -> list:
     """
     Retrieve a paginated list of accession jobs.
@@ -131,7 +133,11 @@ def get_accession_job_list(
 
 
 @router.get("/{id}", response_model=AccessionJobDetailOutput)
-def get_accession_job_detail(id: int, session: Session = Depends(get_session)):
+def get_accession_job_detail(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_accession")),
+):
     """
     Retrieves the accession job detail for the given ID.
 
@@ -154,7 +160,9 @@ def get_accession_job_detail(id: int, session: Session = Depends(get_session)):
 
 @router.get("/workflow/{id}", response_model=AccessionJobDetailOutput)
 def get_accession_job_detail_by_workflow(
-    id: int, session: Session = Depends(get_session)
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_accession")),
 ):
     """
     Retrieves the accession job detail for the given workflow id.
@@ -180,7 +188,9 @@ def get_accession_job_detail_by_workflow(
 
 @router.post("/", response_model=AccessionJobDetailOutput, status_code=201)
 def create_accession_job(
-    accession_job_input: AccessionJobInput, session: Session = Depends(get_session)
+    accession_job_input: AccessionJobInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_accession")),
 ) -> AccessionJob:
     """
     Create a new accession job:
@@ -237,6 +247,7 @@ def update_accession_job(
     accession_job: AccessionJobUpdateInput,
     session: Session = Depends(get_session),
     background_tasks: BackgroundTasks = None,
+    _: bool = Depends(require_permissions("can_access_accession")),
 ):
     """
     Update an existing accession job with the provided data.
@@ -280,7 +291,8 @@ def update_accession_job(
     existing_accession_job = commit_record(session, existing_accession_job)
 
     # conditional to avoid transaction concurrency issues
-    if mutated_data.get("status") == "Completed":
+    # Guard: only trigger completion if transitioning TO Completed, not if already Completed
+    if mutated_data.get("status") == "Completed" and original_status != "Completed":
         if existing_accession_job.items:
             items_barcode_ids = [
                 item.barcode_id for item in existing_accession_job.items
@@ -351,7 +363,11 @@ def update_accession_job(
 
 
 @router.delete("/{id}", status_code=204)
-def delete_accession_job(id: int, session: Session = Depends(get_session)):
+def delete_accession_job(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_cancel_accession")),
+):
     """
     Delete an accession job by its ID.
     **Args:**

@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Request, HTTPException, Response, status, Depends
 from fastapi.responses import RedirectResponse, JSONResponse
 from app.config.config import get_settings
+from app.models.groups import Group
 from app.models.users import User
 from sqlmodel import Session, select
 from app.database.session import get_session
@@ -97,14 +98,23 @@ def init_saml_auth(req):
     return auth
 
 def generate_token(user_object, session):
+    user_groups = (
+        session.exec(
+            select(Group)
+            .where(Group.users.any(id=user_object.id))
+        )
+        .unique()
+        .all()
+    )
     payload = {
         "user_id": user_object.id,
         "first_name": user_object.first_name,
         "last_name": user_object.last_name,
-        "email": user_object.email
+        "email": user_object.email,
+        "role": ':'.join([group.name for group in user_groups]),
         # 'exp': datetime.now(timezone.utc) + timedelta(minutes=15)  # Token expires in 15 minutes
     }
-    token = jwt.encode(payload, "your-secret-key", algorithm="HS256")
+    token = jwt.encode(payload, get_settings().JWT_SECRET_KEY, algorithm="HS256")
 
     setattr(user_object, "fetch_auth_token", token)
     setattr(user_object, "fetch_auth_expiration", datetime.now(timezone.utc) + timedelta(minutes=15))

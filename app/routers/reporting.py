@@ -5,11 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlmodel import paginate
-from sqlalchemy import func, union_all, literal, and_, asc, distinct, desc
+from sqlalchemy import func, union_all, literal, and_, or_, asc, distinct, desc
 from sqlalchemy.types import String
 from sqlmodel import Session, select
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.logger import inventory_logger
 from app.filter_params import (
     SortParams,
@@ -23,6 +24,7 @@ from app.filter_params import (
     VerificationChangesParams,
     RetrievalCountParams,
     MoveDiscrepancyParams,
+    NotShelvedParams,
 )
 from app.models.accession_jobs import AccessionJob
 from app.models.aisle_numbers import AisleNumber
@@ -67,7 +69,8 @@ from app.schemas.reporting import (
     UserJobItemCountReadOutput,
     VerificationChangesOutput,
     RetrievalItemCountReadOutput,
-    MoveDiscrepancyOutput
+    MoveDiscrepancyOutput,
+    NotShelvedOutput,
 )
 from app.config.exceptions import NotFound, BadRequest, InternalServerError
 from app.sorting import (
@@ -240,6 +243,7 @@ def get_accessioned_items_count(
     session: Session = Depends(get_session),
     params: AccessionedItemsParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ):
     """
     The count of items that have been accessioned.
@@ -269,6 +273,7 @@ def get_accessioned_items_csv(
     session: Session = Depends(get_session),
     params: AccessionedItemsParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ):
     """
     Translates list response of AccessionedItems objects to csv,
@@ -345,6 +350,7 @@ def get_shelving_job_discrepancy_list(
     session: Session = Depends(get_session),
     params: ShelvingJobDiscrepancyParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ) -> list:
     """
     Returns a list of ShelvingJobDiscrepancy objects.
@@ -382,6 +388,7 @@ def get_shelving_job_discrepancy_list(
 def get_shelving_job_report_csv(
     session: Session = Depends(get_session),
     params: ShelvingJobDiscrepancyParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ):
     """
     Translates list response of ShelvingJobDiscrepancy objects to csv,
@@ -485,7 +492,7 @@ def get_shelving_job_report_csv(
     "/shelving-job-discrepancies/{id}", response_model=ShelvingJobDiscrepancyOutput
 )
 def get_shelving_job_discrepancy_detail(
-    id: int, session: Session = Depends(get_session)
+    id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_access_reports"))
 ):
     """
     Returns a single Shelving Job Discrepancy object
@@ -504,6 +511,7 @@ def get_open_locations_list(
     session: Session = Depends(get_session),
     params: OpenLocationParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ) -> list:
     """
     Returns a paginated list of shelf objects with
@@ -586,7 +594,7 @@ def get_open_locations_list(
 
 @router.get("/open-locations/download", response_class=StreamingResponse)
 def get_open_locations_csv(
-    session: Session = Depends(get_session), params: OpenLocationParams = Depends()
+    session: Session = Depends(get_session), params: OpenLocationParams = Depends(), _: bool = Depends(require_permissions("can_access_reports"))
 ):
     """
     Returns a csv report of shelf objects with
@@ -754,6 +762,7 @@ def get_aisle_items_count(
     session: Session = Depends(get_session),
     params: AisleItemsCountParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ) -> list:
     """
     Get the total number of items in an aisle.
@@ -798,6 +807,7 @@ def get_aisle_items_count(
 def get_aisles_items_count_csv(
     session: Session = Depends(get_session),
     params: AisleItemsCountParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ):
     """
     Download the total number of items in an aisle.
@@ -931,6 +941,7 @@ def get_non_tray_item_count(
     session: Session = Depends(get_session),
     params: NonTrayItemsCountParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ) -> list:
     """
     Get the total number of non tray items in an aisle.
@@ -976,6 +987,7 @@ def get_non_tray_item_count(
 def get_non_tray_item_count_csv(
     session: Session = Depends(get_session),
     params: NonTrayItemsCountParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ):
     """
       Download  the count of non-tray items in the building.
@@ -1116,6 +1128,7 @@ def get_tray_item_count(
     session: Session = Depends(get_session),
     params: TrayItemCountParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ) -> list:
     """
     Get the total number of tray items in an aisle.
@@ -1156,6 +1169,7 @@ def get_tray_item_count(
 def get_tray_item_count_csv(
     session: Session = Depends(get_session),
     params: TrayItemCountParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ):
     """
       Download the count of tray items in the building.
@@ -1592,6 +1606,7 @@ def get_user_job_summary(
     session: Session = Depends(get_session),
     params: UserJobItemsCountParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ) -> list:
 
     if params.user_id:
@@ -1606,7 +1621,7 @@ def get_user_job_summary(
 
 @router.get("/user-jobs/count/download", response_class=StreamingResponse)
 def get_user_job_summary_csv(
-    session: Session = Depends(get_session), params: UserJobItemsCountParams = Depends()
+    session: Session = Depends(get_session), params: UserJobItemsCountParams = Depends(), _: bool = Depends(require_permissions("can_access_reports"))
 ):
     query = get_user_job_summary_query(params)
 
@@ -1686,6 +1701,7 @@ def get_verification_change_summary(
     session: Session = Depends(get_session),
     params: VerificationChangesParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ) -> list:
     """
     Returns a list of VerificationChanges objects.
@@ -1713,6 +1729,7 @@ def get_verification_change_summary(
 def get_verification_change_summary_csv(
     session: Session = Depends(get_session),
     params: VerificationChangesParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ):
     query = get_verification_change_query(params)
     query = query.subquery()
@@ -1853,6 +1870,7 @@ def get_retrieval_count(
     session: Session = Depends(get_session),
     params: RetrievalCountParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ):
     """
     The count of items retrieved.
@@ -1878,7 +1896,7 @@ def get_retrieval_count(
 
 @router.get("/retrievals/count/download", response_class=StreamingResponse)
 def get_retrieval_count_csv(
-    session: Session = Depends(get_session), params: RetrievalCountParams = Depends()
+    session: Session = Depends(get_session), params: RetrievalCountParams = Depends(), _: bool = Depends(require_permissions("can_access_reports"))
 ):
     query = get_retrieval_item_count_query(params)
 
@@ -1918,6 +1936,7 @@ def get_move_discrepancy_list(
     session: Session = Depends(get_session),
     params: MoveDiscrepancyParams = Depends(),
     sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ) -> list:
     """
     Returns a list of Move Discrepancy objects.
@@ -1957,6 +1976,7 @@ def get_move_discrepancy_list(
 def get_move_report_csv(
     session: Session = Depends(get_session),
     params: MoveDiscrepancyParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports"))
 ):
     """
     Translates list response of move Discrepancy objects to csv,
@@ -2055,5 +2075,125 @@ def get_move_report_csv(
         media_type="text/csv",
         headers={
             "Content-Disposition": "attachment; filename=shelving_discrepancies.csv"
+        },
+    )
+
+
+def _build_not_shelved_query_for_model(Model, params):
+    """Build a not-shelved select query for a single model (Tray and/or NonTrayItem)."""
+    return (
+        select(
+            Barcode.value.label("barcode_value"),
+            Owner.name.label("owner_name"),
+            VerificationJob.workflow_id.label("workflow_id"),
+            Model.accession_dt.label("accession_dt"),
+        )
+        .select_from(Model)
+        .join(Barcode, Barcode.id == Model.barcode_id)
+        .outerjoin(Owner, Owner.id == Model.owner_id)
+        .outerjoin(VerificationJob, VerificationJob.id == Model.verification_job_id)
+        .where(
+            or_(
+                Model.shelf_position_id == None,
+                Model.scanned_for_shelving == False,
+            ),
+            Barcode.withdrawn == False,
+            Model.accession_dt >= params.from_dt,
+            Model.accession_dt <= params.to_dt,
+        )
+    )
+
+
+def get_not_shelved_query(params, sort_params=None):
+    """
+    Construct the query to fetch trays and/or non-tray items that are
+    not shelved, excluding withdrawn items.
+    """
+    if params.container_type == "Tray":
+        query = _build_not_shelved_query_for_model(Tray, params)
+    elif params.container_type == "NonTray":
+        query = _build_not_shelved_query_for_model(NonTrayItem, params)
+    elif params.container_type == "Both":
+        tray_query = _build_not_shelved_query_for_model(Tray, params)
+        non_tray_query = _build_not_shelved_query_for_model(NonTrayItem, params)
+        query = union_all(tray_query, non_tray_query)
+    else:
+        raise BadRequest(
+            detail="Invalid container_type. Allowed values: 'Tray', 'NonTray', 'Both'"
+        )
+
+    needs_subquery = params.container_type == "Both"
+
+    if sort_params is not None and sort_params.sort_by:
+        sub = query.subquery()
+        sort_col = getattr(sub.c, sort_params.sort_by, None)
+        if sort_col is not None:
+            order = desc(sort_col) if sort_params.sort_order == "desc" else asc(sort_col)
+            return select(sub).order_by(order)
+        return select(sub)
+
+    if needs_subquery:
+        sub = query.subquery()
+        return select(sub).order_by(desc(sub.c.accession_dt))
+
+    return query.order_by(desc("accession_dt"))
+
+
+@router.get("/not-shelved/", response_model=Page[NotShelvedOutput])
+def get_not_shelved_report(
+    session: Session = Depends(get_session),
+    params: NotShelvedParams = Depends(),
+    sort_params: SortParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports")),
+):
+    """
+    Returns a paginated list of trays and/or non-tray items that have been
+    accessioned but not yet shelved.
+    """
+    query = get_not_shelved_query(params, sort_params)
+    sub = query.subquery()
+    return paginate(session, select(sub))
+
+
+@router.get("/not-shelved/download", response_class=StreamingResponse)
+def get_not_shelved_csv(
+    session: Session = Depends(get_session),
+    params: NotShelvedParams = Depends(),
+    _: bool = Depends(require_permissions("can_access_reports")),
+):
+    """
+    Download CSV of trays and/or non-tray items that are not shelved.
+    """
+    query = get_not_shelved_query(params)
+    sub = query.subquery()
+
+    def generate_csv():
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(
+            ["barcode_value", "owner_name", "workflow_id", "accession_dt"]
+        )
+        yield output.getvalue()
+        output.seek(0)
+        output.truncate(0)
+
+        for row in session.execute(select(sub)):
+            writer.writerow(
+                [
+                    row.barcode_value,
+                    row.owner_name,
+                    row.workflow_id,
+                    row.accession_dt,
+                ]
+            )
+            yield output.getvalue()
+            output.seek(0)
+            output.truncate(0)
+
+    return StreamingResponse(
+        generate_csv(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=not_shelved_report.csv"
         },
     )

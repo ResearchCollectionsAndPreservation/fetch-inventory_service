@@ -28,6 +28,7 @@ from app.schemas.barcodes import (
 )
 from app.config.exceptions import NotFound, ValidationException
 from app.sorting import BaseSorter
+from app.permissions import require_permissions
 
 router = APIRouter(
     prefix="/barcodes",
@@ -106,7 +107,8 @@ def get_barcode_by_value(value: str, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=BarcodeDetailWriteOutput, status_code=201)
 def create_barcode(
-    barcode_input: BarcodeInput, session: Session = Depends(get_session)
+    barcode_input: BarcodeInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_accession", "can_access_verification", any_of=True)),
 ) -> Barcode:
     """
     Create a new barcode.
@@ -178,7 +180,8 @@ def create_barcode(
 
 @router.patch("/{id}", response_model=BarcodeDetailWriteOutput)
 def update_barcode(
-    id: uuid.UUID, barcode: BarcodeUpdateInput, session: Session = Depends(get_session)
+    id: uuid.UUID, barcode: BarcodeUpdateInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_accession", "can_access_verification", any_of=True)),
 ):
     """
     Update barcode details.
@@ -317,7 +320,7 @@ def update_barcode(
 
 
 @router.delete("/{id}")
-def delete_barcode(id: uuid.UUID, session: Session = Depends(get_session)):
+def delete_barcode(id: uuid.UUID, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_access_accession", "can_access_verification", any_of=True))):
     """
     Deletes a barcode by its ID.
 

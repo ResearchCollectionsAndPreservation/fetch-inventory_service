@@ -22,6 +22,7 @@ from app.config.exceptions import (
     InternalServerError,
 )
 from app.sorting import BaseSorter
+from app.permissions import require_permissions
 
 router = APIRouter(
     prefix="/sides",
@@ -83,6 +84,7 @@ def get_side_orientation_detail(id: int, session: Session = Depends(get_session)
 def create_side_orientation(
     side_orientation_input: SideOrientationInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Create a new side orientation record.
@@ -110,6 +112,7 @@ def update_side_orientation(
     id: int,
     side_orientation: SideOrientationUpdateInput,
     session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Update a side orientation by its ID.
@@ -148,7 +151,7 @@ def update_side_orientation(
 
 
 @router.delete("/orientations/{id}")
-def delete_side_orientation(id: int, session: Session = Depends(get_session)):
+def delete_side_orientation(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Deletes a side orientation with the given ID.
 

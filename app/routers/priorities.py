@@ -8,6 +8,7 @@ from fastapi_pagination.ext.sqlmodel import paginate
 from sqlalchemy.exc import IntegrityError
 
 from app.database.session import get_session
+from app.permissions import require_permissions
 from app.filter_params import SortParams
 from app.models.priorities import Priority
 from app.schemas.priorities import (
@@ -35,6 +36,7 @@ def get_priority_list(
     session: Session = Depends(get_session),
     sort_params: SortParams = Depends(),
     search: Optional[str] = Query(None, description="Search by Priority Value"),
+    _: bool = Depends(require_permissions("can_access_request", "can_search", any_of=True)),
 ) -> list:
     """
     Get a list of priorities
@@ -62,7 +64,11 @@ def get_priority_list(
 
 
 @router.get("/priorities/{id}", response_model=PriorityDetailReadOutput)
-def get_priority_detail(id: int, session: Session = Depends(get_session)):
+def get_priority_detail(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_access_request", "can_search", any_of=True)),
+):
     """
     Retrieve priority details by ID
     """
@@ -75,7 +81,9 @@ def get_priority_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/priorities", response_model=PriorityDetailWriteOutput, status_code=201)
 def create_priority(
-    priority_input: PriorityInput, session: Session = Depends(get_session)
+    priority_input: PriorityInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_groups_and_permissions")),
 ) -> Priority:
     """
     Create a Priority
@@ -95,7 +103,10 @@ def create_priority(
 
 @router.patch("/priorities/{id}", response_model=PriorityDetailWriteOutput)
 def update_priority(
-    id: int, priority: PriorityUpdateInput, session: Session = Depends(get_session)
+    id: int,
+    priority: PriorityUpdateInput,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_groups_and_permissions")),
 ):
     """
     Update an existing Priority
@@ -123,7 +134,11 @@ def update_priority(
 
 
 @router.delete("/priorities/{id}")
-def delete_priority(id: int, session: Session = Depends(get_session)):
+def delete_priority(
+    id: int,
+    session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_groups_and_permissions")),
+):
     """
     Delete an Priority by ID
     """

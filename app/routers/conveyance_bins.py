@@ -21,6 +21,7 @@ from app.config.exceptions import (
     InternalServerError,
 )
 from app.sorting import BaseSorter
+from app.permissions import require_permissions
 
 router = APIRouter(
     prefix="/conveyance-bins",
@@ -77,7 +78,8 @@ def get_conveyance_bin_detail(id: int, session: Session = Depends(get_session)):
 
 @router.post("/", response_model=ConveyanceBinDetailWriteOutput, status_code=201)
 def create_conveyance_bin(
-    conveyance_bin_input: ConveyanceBinInput, session: Session = Depends(get_session)
+    conveyance_bin_input: ConveyanceBinInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Create a new conveyance bin in the database.
@@ -104,7 +106,8 @@ def create_conveyance_bin(
 
 @router.patch("/{id}", response_model=ConveyanceBinDetailWriteOutput)
 def update_conveyance_bin(
-    id: int, conveyance_bin: ConveyanceBinInput, session: Session = Depends(get_session)
+    id: int, conveyance_bin: ConveyanceBinInput, session: Session = Depends(get_session),
+    _: bool = Depends(require_permissions("can_manage_locations")),
 ):
     """
     Update conveyance bin details by ID.
@@ -140,7 +143,7 @@ def update_conveyance_bin(
 
 
 @router.delete("/{id}", status_code=204)
-def delete_conveyance_bin(id: int, session: Session = Depends(get_session)):
+def delete_conveyance_bin(id: int, session: Session = Depends(get_session), _: bool = Depends(require_permissions("can_manage_locations"))):
     """
     Delete a conveyance bin by id.
 
